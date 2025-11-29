@@ -919,4 +919,214 @@ export const storage: IStorage = {
       .set({ status: "submitted", submittedAt: new Date() })
       .where(eq(examSessions.id, sessionId));
   },
+
+  async getSessionAnswersForGrading(sessionId: number): Promise<{
+    answerId: number;
+    questionId: number;
+    questionText: string;
+    sampleAnswer: string | null;
+    keywords: string[];
+    answerText: string | null;
+  }[]> {
+    const results = await db
+      .select({
+        answerId: studentAnswers.id,
+        questionId: studentAnswers.questionId,
+        questionText: questions.text,
+        sampleAnswer: questions.sampleAnswer,
+        keywords: questions.keywords,
+        answerText: studentAnswers.answerText,
+      })
+      .from(studentAnswers)
+      .innerJoin(questions, eq(studentAnswers.questionId, questions.id))
+      .where(eq(studentAnswers.sessionId, sessionId));
+    
+    return results.map(r => ({
+      ...r,
+      keywords: Array.isArray(r.keywords) ? r.keywords : [],
+    }));
+  },
+
+  async updateAnswerGrade(answerId: number, score: string, feedback: object): Promise<void> {
+    await db.update(studentAnswers)
+      .set({ 
+        aiScore: score,
+        aiFeedback: feedback,
+      })
+      .where(eq(studentAnswers.id, answerId));
+  },
+
+  async getTeacherExamResults(teacherId: string, examIdFilter?: number): Promise<any[]> {
+    let query = db
+      .select({
+        sessionId: examSessions.id,
+        studentId: examSessions.studentId,
+        studentName: users.fullName,
+        examId: examSessions.examId,
+        examName: exams.name,
+        status: examSessions.status,
+        startedAt: examSessions.startedAt,
+        submittedAt: examSessions.submittedAt,
+        violationsCount: examSessions.violationsCount,
+        ticketNumber: tickets.ticketNumber,
+        subjectName: subjects.name,
+        groupName: groups.name,
+      })
+      .from(examSessions)
+      .innerJoin(exams, eq(examSessions.examId, exams.id))
+      .innerJoin(users, eq(examSessions.studentId, users.id))
+      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .innerJoin(subjects, eq(exams.subjectId, subjects.id))
+      .innerJoin(groups, eq(exams.groupId, groups.id))
+      .where(eq(exams.teacherId, teacherId));
+    
+    if (examIdFilter) {
+      query = query.where(and(eq(exams.teacherId, teacherId), eq(exams.id, examIdFilter)));
+    }
+    
+    const sessions = await query.orderBy(desc(examSessions.submittedAt));
+    
+    const results = await Promise.all(sessions.map(async (session) => {
+      const answers = await db
+        .select({
+          aiScore: studentAnswers.aiScore,
+        })
+        .from(studentAnswers)
+        .where(eq(studentAnswers.sessionId, session.sessionId));
+      
+      const totalScore = answers.reduce((sum, a) => sum + (parseFloat(a.aiScore || "0")), 0);
+      const maxScore = answers.length * 15;
+      
+      return {
+        ...session,
+        totalScore,
+        maxScore,
+        answersCount: answers.length,
+      };
+    }));
+    
+    return results;
+  },
+
+  async getSessionDetails(sessionId: number, teacherId: string): Promise<any | null> {
+    const [session] = await db
+      .select({
+        sessionId: examSessions.id,
+        studentId: examSessions.studentId,
+        studentName: users.fullName,
+        examId: examSessions.examId,
+        examName: exams.name,
+        status: examSessions.status,
+        startedAt: examSessions.startedAt,
+        submittedAt: examSessions.submittedAt,
+        violationsCount: examSessions.violationsCount,
+        violationDetails: examSessions.violationDetails,
+        ticketNumber: tickets.ticketNumber,
+        subjectName: subjects.name,
+        groupName: groups.name,
+      })
+      .from(examSessions)
+      .innerJoin(exams, eq(examSessions.examId, exams.id))
+      .innerJoin(users, eq(examSessions.studentId, users.id))
+      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .innerJoin(subjects, eq(exams.subjectId, subjects.id))
+      .innerJoin(groups, eq(exams.groupId, groups.id))
+      .where(and(eq(examSessions.id, sessionId), eq(exams.teacherId, teacherId)))
+      .limit(1);
+    
+    if (!session) return null;
+    
+    const answers = await db
+      .select({
+        id: studentAnswers.id,
+        questionId: studentAnswers.questionId,
+        questionText: questions.text,
+        sampleAnswer: questions.sampleAnswer,
+        keywords: questions.keywords,
+        answerText: studentAnswers.answerText,
+        aiScore: studentAnswers.aiScore,
+        aiFeedback: studentAnswers.aiFeedback,
+        manualScore: studentAnswers.manualScore,
+        manualComment: studentAnswers.manualComment,
+        answeredAt: studentAnswers.answeredAt,
+      })
+      .from(studentAnswers)
+      .innerJoin(questions, eq(studentAnswers.questionId, questions.id))
+      .where(eq(studentAnswers.sessionId, sessionId));
+    
+    return {
+      ...session,
+      answers,
+    };
+  },
+
+  async updateAnswerManualScore(answerId: number, score: number, comment: string): Promise<void> {
+    await db.update(studentAnswers)
+      .set({ 
+        manualScore: score.toString(),
+        manualComment: comment,
+      })
+      .where(eq(studentAnswers.id, answerId));
+  },
+
+  async getExamExportData(examId: number, teacherId: string): Promise<any> {
+    const [exam] = await db
+      .select({
+        id: exams.id,
+        name: exams.name,
+        subjectName: subjects.name,
+        groupName: groups.name,
+        examDate: exams.examDate,
+      })
+      .from(exams)
+      .innerJoin(subjects, eq(exams.subjectId, subjects.id))
+      .innerJoin(groups, eq(exams.groupId, groups.id))
+      .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
+      .limit(1);
+    
+    if (!exam) return null;
+    
+    const sessions = await db
+      .select({
+        sessionId: examSessions.id,
+        studentId: examSessions.studentId,
+        studentName: users.fullName,
+        status: examSessions.status,
+        submittedAt: examSessions.submittedAt,
+        violationsCount: examSessions.violationsCount,
+        ticketNumber: tickets.ticketNumber,
+      })
+      .from(examSessions)
+      .innerJoin(users, eq(examSessions.studentId, users.id))
+      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .where(eq(examSessions.examId, examId));
+    
+    const results = await Promise.all(sessions.map(async (session) => {
+      const answers = await db
+        .select({
+          aiScore: studentAnswers.aiScore,
+          manualScore: studentAnswers.manualScore,
+        })
+        .from(studentAnswers)
+        .where(eq(studentAnswers.sessionId, session.sessionId));
+      
+      const totalScore = answers.reduce((sum, a) => {
+        const score = a.manualScore ? parseFloat(a.manualScore) : parseFloat(a.aiScore || "0");
+        return sum + score;
+      }, 0);
+      const maxScore = answers.length * 15;
+      
+      return {
+        ...session,
+        totalScore,
+        maxScore,
+        percentage: maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0,
+      };
+    }));
+    
+    return {
+      exam,
+      results,
+    };
+  },
 };

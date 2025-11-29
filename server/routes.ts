@@ -69,7 +69,11 @@ async function extractTextFromFile(filePath: string, fileType: string): Promise<
 async function generateQuestionsWithAI(content: string, subjectId: number, lectureId: number): Promise<{ text: string; keywords: string[]; sampleAnswer: string; difficulty: string }[]> {
   try {
     const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "",
+      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
+      httpOptions: {
+        apiVersion: "",
+        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+      },
     });
 
     const prompt = `Sen SmartExam tizimi uchun imtihon savollarini yaratuvchi AI assistantisan.
@@ -93,11 +97,27 @@ JAVOBNI FAQAT JSON FORMATDA BER (boshqa hech narsa yozma):
 ]`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-001",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
-    const text = response.text || "";
+    let text = "";
+    try {
+      if (response.response?.text) {
+        const textResult = response.response.text();
+        text = typeof textResult === "string" ? textResult : await textResult;
+      } else if (response.candidates?.[0]?.content?.parts) {
+        text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
+      } else if (typeof response.text === "function") {
+        const textResult = response.text();
+        text = typeof textResult === "string" ? textResult : await textResult;
+      } else if (typeof response.text === "string") {
+        text = response.text;
+      }
+    } catch (textError) {
+      console.error("Error extracting text from response:", textError);
+    }
+    console.log("AI question generation response:", text.substring(0, 200));
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return [];
 
@@ -107,6 +127,144 @@ JAVOBNI FAQAT JSON FORMATDA BER (boshqa hech narsa yozma):
     console.error("AI question generation error:", error);
     return [];
   }
+}
+
+interface GradingResult {
+  score: number;
+  maxScore: number;
+  feedback: {
+    relevance: { score: number; comment: string };
+    completeness: { score: number; comment: string };
+    clarity: { score: number; comment: string };
+    keywords: { score: number; comment: string };
+    logic: { score: number; comment: string };
+  };
+  overallComment: string;
+}
+
+async function gradeAnswerWithAI(
+  questionText: string,
+  sampleAnswer: string,
+  keywords: string[],
+  studentAnswer: string
+): Promise<GradingResult> {
+  try {
+    const ai = new GoogleGenAI({
+      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
+      httpOptions: {
+        apiVersion: "",
+        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+      },
+    });
+
+    const prompt = `Sen SmartExam tizimi uchun talaba javoblarini baholovchi AI assistantisan.
+
+SAVOL:
+${questionText}
+
+NAMUNA JAVOB:
+${sampleAnswer}
+
+KALIT SO'ZLAR:
+${keywords.join(", ")}
+
+TALABA JAVOBI:
+${studentAnswer || "(Javob berilmagan)"}
+
+Talaba javobini quyidagi 5 ta mezon bo'yicha baholab, har biriga 0-3 ball ber:
+1. Relevance (Tegishlilik) - Javob savolga to'g'ri javob berganmi?
+2. Completeness (To'liqlik) - Javob barcha kerakli ma'lumotlarni o'z ichiga olganmi?
+3. Clarity (Aniqlik) - Javob ravshan va tushunarli yozilganmi?
+4. Keywords (Kalit so'zlar) - Javobda muhim kalit so'zlar ishlatilganmi?
+5. Logic (Mantiqiylik) - Javob mantiqiy izchilmi?
+
+JAVOBNI FAQAT JSON FORMATDA BER:
+{
+  "score": <jami ball 0-15>,
+  "maxScore": 15,
+  "feedback": {
+    "relevance": {"score": <0-3>, "comment": "<qisqa izoh>"},
+    "completeness": {"score": <0-3>, "comment": "<qisqa izoh>"},
+    "clarity": {"score": <0-3>, "comment": "<qisqa izoh>"},
+    "keywords": {"score": <0-3>, "comment": "<qisqa izoh>"},
+    "logic": {"score": <0-3>, "comment": "<qisqa izoh>"}
+  },
+  "overallComment": "<umumiy baho va tavsiyalar>"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    let text = "";
+    try {
+      if (response.response?.text) {
+        const textResult = response.response.text();
+        text = typeof textResult === "string" ? textResult : await textResult;
+      } else if (response.candidates?.[0]?.content?.parts) {
+        text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
+      } else if (typeof response.text === "function") {
+        const textResult = response.text();
+        text = typeof textResult === "string" ? textResult : await textResult;
+      } else if (typeof response.text === "string") {
+        text = response.text;
+      }
+    } catch (textError) {
+      console.error("Error extracting text from response:", textError);
+    }
+    console.log("AI grading response:", text.substring(0, 200));
+    
+    if (!text || text.trim().length === 0) {
+      console.log("Empty text response from AI");
+      return getDefaultGradingResult(studentAnswer);
+    }
+    
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log("No JSON match found in grading response");
+      return getDefaultGradingResult(studentAnswer);
+    }
+
+    try {
+      const result = JSON.parse(jsonMatch[0]);
+      if (!result.feedback || result.score === undefined || result.score === null) {
+        console.log("Invalid grading result structure:", result);
+        return getDefaultGradingResult(studentAnswer);
+      }
+      const score = Number(result.score);
+      if (isNaN(score) || score < 0 || score > 15) {
+        console.log("Invalid score value:", result.score);
+        return getDefaultGradingResult(studentAnswer);
+      }
+      return {
+        ...result,
+        score: score,
+      };
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      return getDefaultGradingResult(studentAnswer);
+    }
+  } catch (error) {
+    console.error("AI grading error:", error);
+    return getDefaultGradingResult(studentAnswer);
+  }
+}
+
+function getDefaultGradingResult(studentAnswer: string): GradingResult {
+  const hasAnswer = studentAnswer && studentAnswer.trim().length > 0;
+  return {
+    score: hasAnswer ? 5 : 0,
+    maxScore: 15,
+    feedback: {
+      relevance: { score: hasAnswer ? 1 : 0, comment: hasAnswer ? "Javob berilgan" : "Javob berilmagan" },
+      completeness: { score: hasAnswer ? 1 : 0, comment: hasAnswer ? "Tekshirilmadi" : "Javob berilmagan" },
+      clarity: { score: hasAnswer ? 1 : 0, comment: hasAnswer ? "Tekshirilmadi" : "Javob berilmagan" },
+      keywords: { score: hasAnswer ? 1 : 0, comment: hasAnswer ? "Tekshirilmadi" : "Javob berilmagan" },
+      logic: { score: hasAnswer ? 1 : 0, comment: hasAnswer ? "Tekshirilmadi" : "Javob berilmagan" },
+    },
+    overallComment: hasAnswer ? "AI baholash vaqtincha mavjud emas" : "Talaba javob bermagan",
+  };
 }
 
 export async function registerRoutes(
@@ -776,9 +934,75 @@ export async function registerRoutes(
     try {
       const { sessionId } = req.params;
       await storage.submitExamSession(parseInt(sessionId));
+      
+      const answers = await storage.getSessionAnswersForGrading(parseInt(sessionId));
+      
+      for (const answer of answers) {
+        try {
+          const gradingResult = await gradeAnswerWithAI(
+            answer.questionText,
+            answer.sampleAnswer || "",
+            answer.keywords || [],
+            answer.answerText || ""
+          );
+          
+          await storage.updateAnswerGrade(
+            answer.answerId,
+            gradingResult.score.toString(),
+            gradingResult
+          );
+        } catch (gradingError) {
+          console.error("Grading error for answer:", answer.answerId, gradingError);
+        }
+      }
+      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Imtihonni topshirishda xatolik" });
+    }
+  });
+
+  app.get("/api/teacher/results", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const examId = req.query.examId ? parseInt(req.query.examId as string) : undefined;
+      const results = await storage.getTeacherExamResults(req.session.userId!, examId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Server xatosi" });
+    }
+  });
+
+  app.get("/api/teacher/results/:sessionId", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const result = await storage.getSessionDetails(parseInt(sessionId), req.session.userId!);
+      if (!result) {
+        return res.status(404).json({ error: "Natija topilmadi" });
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Server xatosi" });
+    }
+  });
+
+  app.patch("/api/teacher/answers/:answerId/score", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { answerId } = req.params;
+      const { score, comment } = req.body;
+      await storage.updateAnswerManualScore(parseInt(answerId), score, comment);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Ballni yangilashda xatolik" });
+    }
+  });
+
+  app.get("/api/teacher/export/:examId", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { examId } = req.params;
+      const data = await storage.getExamExportData(parseInt(examId), req.session.userId!);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Ma'lumotlarni eksport qilishda xatolik" });
     }
   });
 

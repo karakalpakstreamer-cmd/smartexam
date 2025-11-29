@@ -17,11 +17,14 @@ import GroupsPage from "@/pages/registrator/groups";
 import SubjectsPage from "@/pages/registrator/subjects";
 import TeachersPage from "@/pages/registrator/teachers";
 import StudentsPage from "@/pages/registrator/students";
+import MonitoringPage from "@/pages/registrator/monitoring";
 
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import LecturesPage from "@/pages/teacher/lectures";
 import ExamsPage from "@/pages/teacher/exams";
 import CreateExamPage from "@/pages/teacher/create-exam";
+import ResultsPage from "@/pages/teacher/results";
+import SessionDetailsPage from "@/pages/teacher/session-details";
 
 import StudentDashboard from "@/pages/student/dashboard";
 import ExamStartPage from "@/pages/student/exam-start";
@@ -148,6 +151,12 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/registrator/monitoring">
+        <ProtectedRoute allowedRoles={["registrator"]}>
+          <MonitoringPage />
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/oqituvchi">
         <ProtectedRoute allowedRoles={["oqituvchi"]}>
           <TeacherDashboard />
@@ -169,6 +178,18 @@ function Router() {
       <Route path="/oqituvchi/imtihonlar/yaratish">
         <ProtectedRoute allowedRoles={["oqituvchi"]}>
           <CreateExamPage />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/oqituvchi/natijalar">
+        <ProtectedRoute allowedRoles={["oqituvchi"]}>
+          <ResultsPage />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/oqituvchi/natijalar/:sessionId">
+        <ProtectedRoute allowedRoles={["oqituvchi"]}>
+          <SessionDetailsPage />
         </ProtectedRoute>
       </Route>
 
