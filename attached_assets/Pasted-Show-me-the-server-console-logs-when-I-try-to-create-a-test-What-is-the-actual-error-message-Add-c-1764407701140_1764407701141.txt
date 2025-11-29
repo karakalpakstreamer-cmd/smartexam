@@ -1,0 +1,73 @@
+Show me the server console logs when I try to create a test. What is the actual error message? Add console.log statements to the test creation function and see exactly where it fails. and figure out why it doesn't work.
+An error occurred while creating the test. The error message says "An error occurred while creating the test."
+
+From the screenshot I can see that all the information is filled in correctly:
+- Exam name: “History Exam”
+- Subject: “History”
+- Date: 11/30/2025
+- Time: 09:00
+- Duration: 60 minutes
+- Questions for the ticket: 5
+- Selected groups: 304-22 (4th year), 306-22 (4th year)
+- Available questions: 50
+- Question topic: “Topic 1: Introduction” with 10 questions
+
+But when you click on the create button, it shows a red error notification.
+
+Please fix this by checking the following:
+
+## 1. CHECK THE BACKEND ERROR LOGS
+
+Look at the server console to find the actual error message. The frontend only shows a generic error, but the real problem is in the backend.
+
+## 2. COMMON REASONS TO CHECK:
+
+### Database issues:
+- Check that the Exams table exists and has the correct columns
+- Check that the Exam_tickets table exists
+- Check that the Exam_sessions table exists
+- Make sure that all foreign key relationships are correct
+
+### Data validation issues:
+- Check that target_groups is being sent as an array of integers
+- Check that the Subject_id is being sent correctly
+- Check that the teacher_id is being retrieved from the session
+- Check that the date and time format for PostgreSQL is correct
+
+### Ticket creation issues:
+- Check that there are enough questions in the database for the selected subject
+- The system needs at least (number of students × 5) questions to create unique tickets
+- Check that the questions are being retrieved from the Questions table correctly
+
+### Session/Authentication issues:
+- Teacher session make sure it is valid
+- Check that the teacher_id is being passed to the exam creation function correctly
+
+## 3. ADD BETTER ERRORS
+
+Please add a detailed error log to the exam creation endpoint so we can see exactly what is failing:
+
+Add a try-catch with detailed error messages in the exam creation route:
+- Which step failed (exam record creation, ticket creation, session creation)
+- Actual database error message
+- Data being processed when the error occurred
+
+## 4. TEST THE DEVELOPMENT
+
+After fixing, test it by creating an exam:
+- Exam name: "Test exam"
+- Any topic with questions
+- Select at least one group
+- Set the date to tomorrow
+- Set the time to 09:00
+- Duration: 60 minutes
+
+The exam should be successfully created and appear in the exam list.
+
+## 5. ALSO CHECK:
+
+- Make sure the questions table contains questions with the correct subject_id
+- Make sure the selected groups contain students
+- Make sure the exam_tickets creation logic handles edge cases
+
+Please check the server logs, find the exact error, fix it, and verify the exam creation efforts.

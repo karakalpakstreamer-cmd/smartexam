@@ -739,6 +739,7 @@ export const storage: IStorage = {
     questionsPerTicket: number;
     groupIds: number[];
     questionIds: number[];
+    examType?: string;
   }): Promise<{ examId: number; ticketCount: number }> {
     const [exam] = await db.insert(exams).values({
       name: data.name,
@@ -748,8 +749,8 @@ export const storage: IStorage = {
       startTime: data.startTime,
       durationMinutes: data.durationMinutes,
       questionsPerTicket: data.questionsPerTicket,
-      totalQuestions: data.questionIds.length,
       targetGroups: data.groupIds,
+      examType: data.examType || "yozma",
       status: "scheduled",
     }).returning();
     
