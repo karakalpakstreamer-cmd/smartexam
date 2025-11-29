@@ -7,10 +7,10 @@ import fs from "fs";
 import { storage } from "./storage";
 import { GoogleGenAI } from "@google/genai";
 import * as mammoth from "mammoth";
-import { createRequire } from "module";
 
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+// pdf-parse is a CommonJS module - use require-style import
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 declare module "express-session" {
   interface SessionData {

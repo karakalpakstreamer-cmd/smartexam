@@ -5,14 +5,9 @@ import { rm, readFile } from "fs/promises";
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
-  "@google/generative-ai",
-  "@neondatabase/serverless",
   "axios",
-  "connect-pg-simple",
   "cors",
   "date-fns",
-  "drizzle-orm",
-  "drizzle-zod",
   "express",
   "express-rate-limit",
   "express-session",
@@ -21,15 +16,28 @@ const allowlist = [
   "multer",
   "nanoid",
   "nodemailer",
-  "openai",
   "passport",
   "passport-local",
   "stripe",
   "uuid",
-  "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
+];
+
+// Packages that use createRequire or have issues when bundled
+// These must be externalized to avoid runtime errors
+const forceExternal = [
+  "@google/generative-ai",
+  "@neondatabase/serverless", 
+  "connect-pg-simple",
+  "drizzle-orm",
+  "drizzle-zod",
+  "openai",
+  "ws",
+  "xlsx",
+  "bcryptjs",
+  "pdf-parse",
+  "mammoth",
 ];
 
 async function buildAll() {
@@ -44,7 +52,12 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
+  const externals = [
+    ...allDeps.filter((dep) => !allowlist.includes(dep)),
+    ...forceExternal,
+  ];
+  // Remove duplicates
+  const uniqueExternals = [...new Set(externals)];
 
   await esbuild({
     entryPoints: ["server/index.ts"],
@@ -55,8 +68,17 @@ async function buildAll() {
     define: {
       "process.env.NODE_ENV": '"production"',
     },
+    banner: {
+      js: `
+        var __bundle_path__ = require('path');
+        var __bundle_module__ = require('module');
+        var __bundled_filename__ = typeof __filename !== 'undefined' ? __filename : '/app/dist/index.cjs';
+        var __bundled_dirname__ = typeof __dirname !== 'undefined' ? __dirname : __bundle_path__.dirname(__bundled_filename__);
+        var __bundled_require__ = __bundle_module__.createRequire ? __bundle_module__.createRequire(__bundled_filename__) : require;
+      `,
+    },
     minify: true,
-    external: externals,
+    external: uniqueExternals,
     logLevel: "info",
   });
 }
