@@ -64,18 +64,16 @@ export default function CreateExamPage() {
       groupIds: number[];
       questionIds: number[];
     }) => {
-      return apiRequest("/api/exams", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await apiRequest("POST", "/api/exams", data);
+      return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { success: boolean; examId: number; ticketCount: number }) => {
       toast({
         title: "Muvaffaqiyatli!",
         description: `Imtihon yaratildi. ${data.ticketCount} ta bilet generatsiya qilindi.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/today-exams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/exams"] });
       setLocation("/oqituvchi/imtihonlar");
     },
     onError: () => {

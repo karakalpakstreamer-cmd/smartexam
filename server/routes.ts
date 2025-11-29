@@ -832,6 +832,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/student/exams", requireAuth, requireRole("talaba"), async (req, res) => {
+    try {
+      const exams = await storage.getStudentExams(req.session.userId!);
+      res.json(exams);
+    } catch (error) {
+      res.status(500).json({ error: "Server xatosi" });
+    }
+  });
+
   app.get("/api/teacher/questions/:subjectId", requireAuth, requireRole("oqituvchi"), async (req, res) => {
     try {
       const { subjectId } = req.params;

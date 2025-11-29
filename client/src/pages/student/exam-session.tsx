@@ -70,28 +70,20 @@ export default function ExamSessionPage() {
 
   const saveAnswerMutation = useMutation({
     mutationFn: async (data: { questionId: number; answerText: string }) => {
-      return apiRequest(`/api/student/exam-session/${session?.sessionId}/answer`, {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/student/exam-session/${session?.sessionId}/answer`, data);
     },
   });
 
   const submitExamMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/student/exam-session/${session?.sessionId}/submit`, {
-        method: "POST",
-        body: JSON.stringify({ violations: violationsRef.current }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/student/exam-session/${session?.sessionId}/submit`, { violations: violationsRef.current });
     },
     onSuccess: () => {
       toast({
         title: "Muvaffaqiyatli!",
         description: "Imtihon topshirildi",
       });
-      setLocation("/talaba");
+      setLocation("/talaba/imtihonlar");
     },
     onError: () => {
       toast({
@@ -104,11 +96,7 @@ export default function ExamSessionPage() {
 
   const recordViolationMutation = useMutation({
     mutationFn: async (data: { type: string }) => {
-      return apiRequest(`/api/student/exam-session/${session?.sessionId}/violation`, {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/student/exam-session/${session?.sessionId}/violation`, data);
     },
   });
 

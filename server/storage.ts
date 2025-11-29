@@ -99,6 +99,7 @@ export interface IStorage {
   
   getStudentInfo(studentId: number): Promise<{ groupName: string; courseYear: number; facultyName: string; departmentName: string }>;
   getStudentUpcomingExams(studentId: number): Promise<any[]>;
+  getStudentExams(studentId: number): Promise<any[]>;
   
   getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }>;
   getTeacherTodayExams(teacherId: number): Promise<any[]>;
@@ -594,6 +595,46 @@ export const storage: IStorage = {
     return result;
   },
 
+  async getStudentExams(studentId: number): Promise<any[]> {
+    const [student] = await db.select().from(users).where(eq(users.id, studentId)).limit(1);
+    if (!student?.groupId) return [];
+    
+    const allExams = await db.select().from(exams).orderBy(desc(exams.examDate), desc(exams.startTime));
+    const relevantExams = allExams.filter((e) => e.targetGroups?.includes(student.groupId!));
+    
+    const result = await Promise.all(relevantExams.map(async (exam) => {
+      const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
+      const [teacher] = await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1);
+      
+      const [session] = await db.select().from(examSessions)
+        .where(and(eq(examSessions.examId, exam.id), eq(examSessions.studentId, studentId)))
+        .limit(1);
+      
+      let totalScore = 0;
+      if (session) {
+        const answers = await db.select().from(studentAnswers).where(eq(studentAnswers.sessionId, session.id));
+        totalScore = answers.reduce((sum, a) => sum + (parseFloat(a.aiScore || "0") || 0), 0);
+      }
+      
+      return {
+        id: exam.id,
+        name: exam.name,
+        subjectName: subject?.name || "",
+        teacherName: teacher?.fullName || "",
+        examDate: exam.examDate,
+        startTime: exam.startTime,
+        durationMinutes: exam.durationMinutes,
+        questionsPerTicket: exam.questionsPerTicket || 5,
+        status: exam.status,
+        hasSession: !!session,
+        sessionStatus: session?.status,
+        score: Math.round(totalScore * 10) / 10,
+      };
+    }));
+    
+    return result;
+  },
+
   async getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }> {
     const subjectsAssigned = await db.select({ count: count() }).from(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
     const lecturesUploaded = await db.select({ count: count() }).from(lectures).where(eq(lectures.teacherId, teacherId));
@@ -774,6 +815,8 @@ export const storage: IStorage = {
     
     const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
     const [teacher] = await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1);
+    const [group] = await db.select().from(studentGroups).where(eq(studentGroups.id, student.groupId)).limit(1);
+    const [faculty] = student.facultyId ? await db.select().from(faculties).where(eq(faculties.id, student.facultyId)).limit(1) : [null];
     
     const now = new Date();
     const examDateTime = new Date(`${exam.examDate}T${exam.startTime}`);
@@ -790,6 +833,12 @@ export const storage: IStorage = {
       questionsCount: exam.questionsPerTicket,
       status: exam.status,
       canStart,
+      studentInfo: {
+        fullName: student.fullName,
+        userId: student.userId,
+        groupName: group?.name || "",
+        facultyName: faculty?.name || "",
+      },
     };
   },
 

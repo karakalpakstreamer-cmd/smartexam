@@ -28,6 +28,7 @@ import ResultsPage from "@/pages/teacher/results";
 import SessionDetailsPage from "@/pages/teacher/session-details";
 
 import StudentDashboard from "@/pages/student/dashboard";
+import StudentExamsPage from "@/pages/student/exams";
 import ExamStartPage from "@/pages/student/exam-start";
 import ExamSessionPage from "@/pages/student/exam-session";
 
@@ -203,6 +204,12 @@ function Router() {
       <Route path="/talaba">
         <ProtectedRoute allowedRoles={["talaba"]}>
           <StudentDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/talaba/imtihonlar">
+        <ProtectedRoute allowedRoles={["talaba"]}>
+          <StudentExamsPage />
         </ProtectedRoute>
       </Route>
 
