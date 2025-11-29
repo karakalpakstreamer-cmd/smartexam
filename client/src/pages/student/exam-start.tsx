@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { Clock, AlertTriangle, Play, Loader2, ArrowLeft, User, BookOpen, GraduationCap, CheckCircle2 } from "lucide-react";
+import { Clock, AlertTriangle, Play, Loader2, ArrowLeft, User, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,11 +40,47 @@ export default function ExamStartPage() {
   const { toast } = useToast();
   const examId = params?.examId;
   const [acceptedRules, setAcceptedRules] = useState(false);
+  const [canStartNow, setCanStartNow] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<string>("");
 
-  const { data: exam, isLoading } = useQuery<ExamDetails>({
+  const { data: exam, isLoading, refetch } = useQuery<ExamDetails>({
     queryKey: ["/api/student/exam", examId],
     enabled: !!examId,
+    refetchInterval: 10000,
   });
+
+  useEffect(() => {
+    if (!exam) return;
+
+    const checkCanStart = () => {
+      const now = new Date();
+      const examDateTime = new Date(`${exam.examDate}T${exam.startTime}`);
+      const canStart = exam.status === "active" || (now >= examDateTime && exam.status === "scheduled");
+      setCanStartNow(canStart || exam.canStart);
+
+      if (!canStart && !exam.canStart) {
+        const diff = examDateTime.getTime() - now.getTime();
+        if (diff > 0) {
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          if (hours > 0) {
+            setTimeRemaining(`${hours} soat ${minutes} daqiqa ${seconds} soniya`);
+          } else if (minutes > 0) {
+            setTimeRemaining(`${minutes} daqiqa ${seconds} soniya`);
+          } else {
+            setTimeRemaining(`${seconds} soniya`);
+          }
+        }
+      } else {
+        setTimeRemaining("");
+      }
+    };
+
+    checkCanStart();
+    const interval = setInterval(checkCanStart, 1000);
+    return () => clearInterval(interval);
+  }, [exam]);
 
   const startExamMutation = useMutation({
     mutationFn: async () => {
@@ -238,34 +274,55 @@ export default function ExamStartPage() {
           </CardContent>
         </Card>
 
-        {exam.canStart ? (
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handleStart}
-            disabled={!acceptedRules || startExamMutation.isPending}
-            data-testid="button-start-exam"
-          >
-            {startExamMutation.isPending ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Yuklanmoqda...
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5 mr-2" />
-                Tasdiqlash va boshlash
-              </>
+        {canStartNow ? (
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <p className="font-medium text-green-700 dark:text-green-400">
+                Imtihon boshlashga tayyor!
+              </p>
+            </div>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleStart}
+              disabled={!acceptedRules || startExamMutation.isPending}
+              data-testid="button-start-exam"
+            >
+              {startExamMutation.isPending ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Yuklanmoqda...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 mr-2" />
+                  Imtihonni boshlash
+                </>
+              )}
+            </Button>
+            {!acceptedRules && (
+              <p className="text-center text-sm text-muted-foreground">
+                Boshlash uchun yuqoridagi qoidalarni qabul qiling
+              </p>
             )}
-          </Button>
+          </div>
         ) : (
-          <div className="text-center p-4 bg-muted rounded-lg">
+          <div className="text-center p-6 bg-muted rounded-lg space-y-3">
+            <Clock className="w-10 h-10 text-muted-foreground mx-auto" />
             <p className="text-muted-foreground">
               Imtihon hali boshlanmadi. Iltimos, belgilangan vaqtni kuting.
             </p>
-            <p className="font-medium mt-2">
-              Boshlanish vaqti: {exam.startTime}
-            </p>
+            <div className="space-y-1">
+              <p className="font-medium">
+                Boshlanish vaqti: {exam.startTime}
+              </p>
+              {timeRemaining && (
+                <p className="text-lg font-bold text-primary">
+                  {timeRemaining} qoldi
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>

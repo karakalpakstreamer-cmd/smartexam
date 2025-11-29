@@ -868,13 +868,12 @@ export const storage: IStorage = {
     if (!exam) throw new Error("Imtihon topilmadi");
     
     const startedAt = new Date();
-    const endTime = new Date(startedAt.getTime() + exam.durationMinutes * 60 * 1000);
     
     const [session] = await db.insert(examSessions).values({
+      examId,
       ticketId: ticket.id,
       studentId,
       startedAt,
-      endTime,
       status: "active",
       violationsCount: 0,
     }).returning();

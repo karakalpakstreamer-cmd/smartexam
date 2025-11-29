@@ -1,0 +1,66 @@
+The student has accepted the exam rules (checkbox is checked), but the exam is not starting. The page shows "Imtihon hali boshlanmadi. Iltimos, belgilangan vaqtni kuting." and "Boshlanish vaqti: 14:22:00" but even after this time arrives, there is no button to start the exam.
+
+Please fix the following issues:
+
+## ISSUE 1: NO START BUTTON APPEARS
+
+After the student accepts the rules and the exam start time arrives, there should be a "Imtihonni boshlash" (Start Exam) button. This button is missing.
+
+Please add:
+- A prominent "Imtihonni boshlash" button that appears when:
+  1. The checkbox is checked (student accepted rules)
+  2. Current time is equal to or after the exam start time
+- The button should be large, blue, and clearly visible
+- When clicked, it should redirect to the active exam interface
+
+## ISSUE 2: TIME COMPARISON IS NOT WORKING
+
+The system is not correctly comparing the current time with the exam start time.
+
+Please fix the time comparison logic:
+- Get the current time from the user's browser
+- Compare it with the exam's start_time from the database
+- If current time >= exam start time, show the start button
+- If current time < exam start time, show the countdown message
+
+Important: Make sure to handle timezone correctly. The exam time in the database should match the user's local time.
+
+## ISSUE 3: EXAM STATUS CHECK
+
+The system should also check if the exam status is "active" or "scheduled":
+- If exam status is "scheduled" and current time >= start time, automatically change status to "active"
+- If exam status is "active", allow students to start
+- If exam status is "completed" or "cancelled", show appropriate message
+
+## ISSUE 4: ADD REAL-TIME UPDATE
+
+The page should automatically check every few seconds if the exam can be started:
+- Check every 5-10 seconds if current time has reached start time
+- When start time is reached, automatically show the "Imtihonni boshlash" button
+- No need to refresh the page manually
+
+## EXPECTED BEHAVIOR:
+
+Before exam time:
+- Show: "Imtihon hali boshlanmadi. Iltimos, belgilangan vaqtni kuting."
+- Show: Countdown timer to start time
+- Button: Disabled or hidden
+
+When exam time arrives (and checkbox is checked):
+- Show: "Imtihon boshlashga tayyor!"
+- Button: "Imtihonni boshlash" (enabled, blue, prominent)
+
+When student clicks "Imtihonni boshlash":
+- Enter fullscreen mode
+- Redirect to /talaba/imtihon/:id (active exam interface)
+- Start the countdown timer
+- Show first question
+
+## ALSO CHECK:
+
+- Make sure the exam was created successfully in the database
+- Make sure the student has an assigned ticket for this exam
+- Make sure there are questions in the assigned ticket
+- Check if there are any console errors in the browser
+
+Please fix these issues so students can start their exams when the scheduled time arrives.
