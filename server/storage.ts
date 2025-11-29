@@ -393,9 +393,9 @@ export const storage: IStorage = {
     return password;
   },
 
-  async createStudent(data): Promise<{ user: User; password: string }> {
+  async createStudent(data, customPassword?: string): Promise<{ user: User; password: string }> {
     const userId = await this.getNextUserId("S");
-    const password = generatePassword(userId);
+    const password = customPassword || generatePassword(userId);
     const passwordHash = await bcrypt.hash(password, 10);
     
     const group = data.groupId ? await db.select().from(studentGroups).where(eq(studentGroups.id, parseInt(String(data.groupId)))).limit(1) : [];

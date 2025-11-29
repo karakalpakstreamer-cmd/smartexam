@@ -664,9 +664,13 @@ export async function registerRoutes(
 
   app.post("/api/students", requireAuth, requireRole("registrator"), async (req, res) => {
     try {
-      const { fullName, email, groupId } = req.body;
+      const { fullName, email, groupId, autoPassword = true, password } = req.body;
       if (!fullName || !groupId) {
         return res.status(400).json({ error: "Barcha majburiy maydonlarni to'ldiring" });
+      }
+
+      if (autoPassword === false && (!password || password.length < 6)) {
+        return res.status(400).json({ error: "Parol kamida 6 ta belgidan iborat bo'lishi kerak" });
       }
 
       const result = await storage.createStudent({
@@ -676,7 +680,7 @@ export async function registerRoutes(
         userId: "",
         role: "talaba",
         passwordHash: "",
-      });
+      }, autoPassword === false ? password : undefined);
 
       res.json({ userId: result.user.userId, password: result.password });
     } catch (error) {

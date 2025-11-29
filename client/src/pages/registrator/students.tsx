@@ -46,6 +46,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { AppSidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -77,6 +78,8 @@ export default function StudentsPage() {
     facultyId: "",
     departmentId: "",
     groupId: "",
+    autoPassword: true,
+    password: "",
   });
   const { toast } = useToast();
 
@@ -106,7 +109,14 @@ export default function StudentsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/students", data);
+      const res = await apiRequest("POST", "/api/students", {
+        fullName: data.fullName,
+        email: data.email,
+        groupId: data.groupId,
+        autoPassword: data.autoPassword,
+        password: data.autoPassword ? undefined : data.password,
+      });
+      return res.json();
     },
     onSuccess: (response: { userId: string; password: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
@@ -119,6 +129,8 @@ export default function StudentsPage() {
         facultyId: "",
         departmentId: "",
         groupId: "",
+        autoPassword: true,
+        password: "",
       });
     },
     onError: () => {
@@ -158,7 +170,8 @@ export default function StudentsPage() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/students/${id}/reset-password`);
+      const res = await apiRequest("POST", `/api/students/${id}/reset-password`);
+      return res.json();
     },
     onSuccess: (response: { password: string }) => {
       setIsResetPasswordOpen(false);
@@ -186,6 +199,8 @@ export default function StudentsPage() {
       facultyId: "",
       departmentId: "",
       groupId: "",
+      autoPassword: true,
+      password: "",
     });
     setIsAddOpen(true);
   };
@@ -200,6 +215,8 @@ export default function StudentsPage() {
       facultyId: dept?.facultyId?.toString() || "",
       departmentId: student.departmentId?.toString() || "",
       groupId: student.groupId?.toString() || "",
+      autoPassword: true,
+      password: "",
     });
     setIsEditOpen(true);
   };
@@ -225,6 +242,10 @@ export default function StudentsPage() {
   const handleSubmitAdd = () => {
     if (!formData.fullName || !formData.groupId) {
       toast({ variant: "destructive", title: "Xatolik!", description: "Barcha majburiy maydonlarni to'ldiring" });
+      return;
+    }
+    if (!formData.autoPassword && formData.password.length < 6) {
+      toast({ variant: "destructive", title: "Xatolik!", description: "Parol kamida 6 ta belgidan iborat bo'lishi kerak" });
       return;
     }
     createMutation.mutate(formData);
@@ -449,6 +470,30 @@ export default function StudentsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="autoPassword"
+                checked={formData.autoPassword}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoPassword: checked as boolean })}
+                data-testid="checkbox-auto-password"
+              />
+              <label htmlFor="autoPassword" className="text-sm cursor-pointer">
+                Avtomatik parol yaratish
+              </label>
+            </div>
+            {!formData.autoPassword && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Parol *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Kamida 6 ta belgi"
+                  data-testid="input-password"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)} data-testid="button-cancel">

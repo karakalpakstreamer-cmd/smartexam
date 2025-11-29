@@ -161,7 +161,8 @@ export default function TeachersPage() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/teachers/${id}/reset-password`);
+      const res = await apiRequest("POST", `/api/teachers/${id}/reset-password`);
+      return res.json();
     },
     onSuccess: (response: { password: string }) => {
       setIsResetPasswordOpen(false);
