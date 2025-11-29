@@ -382,6 +382,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/export-data", requireAuth, requireRole("registrator"), async (req, res) => {
+    try {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        faculties: await storage.getFaculties(),
+        departments: await storage.getDepartments(),
+        groups: await storage.getGroups(),
+        subjects: await storage.getSubjects(),
+        teachers: await storage.getTeachers(),
+        students: await storage.getStudents(),
+        stats: await storage.getStats(),
+      };
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="smartexam_export_${new Date().toISOString().split("T")[0]}.json"`);
+      res.json(exportData);
+    } catch (error) {
+      console.error("Export error:", error);
+      res.status(500).json({ error: "Ma'lumotlarni eksport qilishda xatolik" });
+    }
+  });
+
   app.get("/api/exams/upcoming", requireAuth, async (req, res) => {
     try {
       const exams = await storage.getUpcomingExams();

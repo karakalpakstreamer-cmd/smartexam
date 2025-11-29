@@ -43,6 +43,7 @@ export const studentGroups = pgTable("student_groups", {
   departmentId: integer("department_id").notNull().references(() => departments.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 50 }).notNull(),
   courseYear: integer("course_year").notNull(),
+  language: varchar("language", { length: 30 }).notNull().default("O'zbek guruhi"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -61,6 +62,13 @@ export const teacherSubjects = pgTable("teacher_subjects", {
   id: serial("id").primaryKey(),
   teacherId: integer("teacher_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   subjectId: integer("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+});
+
+// Subject-Group assignments (which groups study which subjects)
+export const subjectGroups = pgTable("subject_groups", {
+  id: serial("id").primaryKey(),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+  groupId: integer("group_id").notNull().references(() => studentGroups.id, { onDelete: "cascade" }),
 });
 
 // Lectures table
@@ -214,8 +222,20 @@ export const subjectsRelations = relations(subjects, ({ one, many }) => ({
     references: [departments.id],
   }),
   teacherSubjects: many(teacherSubjects),
+  subjectGroups: many(subjectGroups),
   lectures: many(lectures),
   questions: many(questions),
+}));
+
+export const subjectGroupsRelations = relations(subjectGroups, ({ one }) => ({
+  subject: one(subjects, {
+    fields: [subjectGroups.subjectId],
+    references: [subjects.id],
+  }),
+  group: one(studentGroups, {
+    fields: [subjectGroups.groupId],
+    references: [studentGroups.id],
+  }),
 }));
 
 export const teacherSubjectsRelations = relations(teacherSubjects, ({ one }) => ({
@@ -310,6 +330,7 @@ export const insertDepartmentSchema = createInsertSchema(departments).omit({ id:
 export const insertStudentGroupSchema = createInsertSchema(studentGroups).omit({ id: true, createdAt: true });
 export const insertSubjectSchema = createInsertSchema(subjects).omit({ id: true, createdAt: true });
 export const insertTeacherSubjectSchema = createInsertSchema(teacherSubjects).omit({ id: true });
+export const insertSubjectGroupSchema = createInsertSchema(subjectGroups).omit({ id: true });
 export const insertLectureSchema = createInsertSchema(lectures).omit({ id: true, uploadedAt: true });
 export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true, createdAt: true });
 export const insertExamSchema = createInsertSchema(exams).omit({ id: true, createdAt: true });
@@ -331,6 +352,8 @@ export type Subject = typeof subjects.$inferSelect;
 export type InsertSubject = z.infer<typeof insertSubjectSchema>;
 export type TeacherSubject = typeof teacherSubjects.$inferSelect;
 export type InsertTeacherSubject = z.infer<typeof insertTeacherSubjectSchema>;
+export type SubjectGroup = typeof subjectGroups.$inferSelect;
+export type InsertSubjectGroup = z.infer<typeof insertSubjectGroupSchema>;
 export type Lecture = typeof lectures.$inferSelect;
 export type InsertLecture = z.infer<typeof insertLectureSchema>;
 export type Question = typeof questions.$inferSelect;

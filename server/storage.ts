@@ -104,13 +104,8 @@ export interface IStorage {
   getTeacherTodayExams(teacherId: number): Promise<any[]>;
 }
 
-function generatePassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let password = "";
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
+function generatePassword(userId: string): string {
+  return "password" + userId.toLowerCase();
 }
 
 export const storage: IStorage = {
@@ -306,7 +301,7 @@ export const storage: IStorage = {
 
   async createTeacher(data): Promise<{ user: User; password: string }> {
     const userId = await this.getNextUserId("T");
-    const password = data.password || generatePassword();
+    const password = data.password || generatePassword(userId);
     const passwordHash = await bcrypt.hash(password, 10);
     
     const [user] = await db.insert(users).values({
@@ -390,7 +385,9 @@ export const storage: IStorage = {
   },
 
   async resetTeacherPassword(id: number): Promise<string> {
-    const password = generatePassword();
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!user) throw new Error("User not found");
+    const password = generatePassword(user.userId);
     const passwordHash = await bcrypt.hash(password, 10);
     await db.update(users).set({ passwordHash }).where(eq(users.id, id));
     return password;
@@ -398,7 +395,7 @@ export const storage: IStorage = {
 
   async createStudent(data): Promise<{ user: User; password: string }> {
     const userId = await this.getNextUserId("S");
-    const password = generatePassword();
+    const password = generatePassword(userId);
     const passwordHash = await bcrypt.hash(password, 10);
     
     const group = data.groupId ? await db.select().from(studentGroups).where(eq(studentGroups.id, parseInt(String(data.groupId)))).limit(1) : [];
@@ -467,7 +464,9 @@ export const storage: IStorage = {
   },
 
   async resetStudentPassword(id: number): Promise<string> {
-    const password = generatePassword();
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!user) throw new Error("User not found");
+    const password = generatePassword(user.userId);
     const passwordHash = await bcrypt.hash(password, 10);
     await db.update(users).set({ passwordHash }).where(eq(users.id, id));
     return password;

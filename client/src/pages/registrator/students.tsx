@@ -444,7 +444,7 @@ export default function StudentsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {filteredGroups?.map((g) => (
-                    <SelectItem key={g.id} value={g.id.toString()}>{g.name} ({g.courseYear}-kurs)</SelectItem>
+                    <SelectItem key={g.id} value={g.id.toString()}>{g.name} ({g.language || "O'zbek guruhi"})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -558,7 +558,7 @@ export default function StudentsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {filteredGroups?.map((g) => (
-                    <SelectItem key={g.id} value={g.id.toString()}>{g.name} ({g.courseYear}-kurs)</SelectItem>
+                    <SelectItem key={g.id} value={g.id.toString()}>{g.name} ({g.language || "O'zbek guruhi"})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

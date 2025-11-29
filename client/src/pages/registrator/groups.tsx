@@ -60,7 +60,7 @@ export default function GroupsPage() {
   const [filterFaculty, setFilterFaculty] = useState<string>("all");
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
   const [filterCourse, setFilterCourse] = useState<string>("all");
-  const [formData, setFormData] = useState({ name: "", courseYear: "1", facultyId: "", departmentId: "" });
+  const [formData, setFormData] = useState({ name: "", courseYear: "1", facultyId: "", departmentId: "", language: "O'zbek guruhi" });
   const { toast } = useToast();
 
   const { data: groups, isLoading } = useQuery<GroupWithStats[]>({
@@ -80,13 +80,13 @@ export default function GroupsPage() {
   );
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; courseYear: number; departmentId: number }) => {
+    mutationFn: async (data: { name: string; courseYear: number; departmentId: number; language: string }) => {
       return apiRequest("POST", "/api/groups", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       setIsAddOpen(false);
-      setFormData({ name: "", courseYear: "1", facultyId: "", departmentId: "" });
+      setFormData({ name: "", courseYear: "1", facultyId: "", departmentId: "", language: "O'zbek guruhi" });
       toast({ title: "Muvaffaqiyatli!", description: "Guruh qo'shildi" });
     },
     onError: () => {
@@ -95,7 +95,7 @@ export default function GroupsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string; courseYear: number; departmentId: number } }) => {
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; courseYear: number; departmentId: number; language: string } }) => {
       return apiRequest("PATCH", `/api/groups/${id}`, data);
     },
     onSuccess: () => {
@@ -133,7 +133,7 @@ export default function GroupsPage() {
   });
 
   const handleAdd = () => {
-    setFormData({ name: "", courseYear: "1", facultyId: "", departmentId: "" });
+    setFormData({ name: "", courseYear: "1", facultyId: "", departmentId: "", language: "O'zbek guruhi" });
     setIsAddOpen(true);
   };
 
@@ -145,6 +145,7 @@ export default function GroupsPage() {
       courseYear: group.courseYear.toString(),
       facultyId: dept?.facultyId?.toString() || "",
       departmentId: group.departmentId.toString(),
+      language: group.language || "O'zbek guruhi",
     });
     setIsEditOpen(true);
   };
@@ -155,7 +156,7 @@ export default function GroupsPage() {
   };
 
   const handleSubmitAdd = () => {
-    if (!formData.name || !formData.courseYear || !formData.departmentId) {
+    if (!formData.name || !formData.courseYear || !formData.departmentId || !formData.language) {
       toast({ variant: "destructive", title: "Xatolik!", description: "Barcha maydonlarni to'ldiring" });
       return;
     }
@@ -163,17 +164,19 @@ export default function GroupsPage() {
       name: formData.name,
       courseYear: parseInt(formData.courseYear),
       departmentId: parseInt(formData.departmentId),
+      language: formData.language,
     });
   };
 
   const handleSubmitEdit = () => {
-    if (!selectedGroup || !formData.name || !formData.courseYear || !formData.departmentId) return;
+    if (!selectedGroup || !formData.name || !formData.courseYear || !formData.departmentId || !formData.language) return;
     updateMutation.mutate({
       id: selectedGroup.id,
       data: {
         name: formData.name,
         courseYear: parseInt(formData.courseYear),
         departmentId: parseInt(formData.departmentId),
+        language: formData.language,
       },
     });
   };
@@ -249,6 +252,7 @@ export default function GroupsPage() {
                       <TableHead>Yo'nalish</TableHead>
                       <TableHead>Fakultet</TableHead>
                       <TableHead className="text-center">Kurs</TableHead>
+                      <TableHead>Til</TableHead>
                       <TableHead className="text-center">Talabalar soni</TableHead>
                       <TableHead className="text-right">Harakatlar</TableHead>
                     </TableRow>
@@ -261,6 +265,9 @@ export default function GroupsPage() {
                         <TableCell>{group.facultyName}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline">{group.courseYear}-kurs</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{group.language || "O'zbek guruhi"}</Badge>
                         </TableCell>
                         <TableCell className="text-center">{group.studentsCount}</TableCell>
                         <TableCell className="text-right">
@@ -361,6 +368,19 @@ export default function GroupsPage() {
                 ))}
               </RadioGroup>
             </div>
+            <div className="space-y-2">
+              <Label>Til *</Label>
+              <Select value={formData.language} onValueChange={(v) => setFormData({ ...formData, language: v })}>
+                <SelectTrigger data-testid="select-add-language">
+                  <SelectValue placeholder="Til tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="O'zbek guruhi">O'zbek guruhi</SelectItem>
+                  <SelectItem value="Qoraqalpoq guruhi">Qoraqalpoq guruhi</SelectItem>
+                  <SelectItem value="Rus guruhi">Rus guruhi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)} data-testid="button-cancel">
@@ -424,6 +444,19 @@ export default function GroupsPage() {
                   </div>
                 ))}
               </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label>Til *</Label>
+              <Select value={formData.language} onValueChange={(v) => setFormData({ ...formData, language: v })}>
+                <SelectTrigger data-testid="select-edit-language">
+                  <SelectValue placeholder="Til tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="O'zbek guruhi">O'zbek guruhi</SelectItem>
+                  <SelectItem value="Qoraqalpoq guruhi">Qoraqalpoq guruhi</SelectItem>
+                  <SelectItem value="Rus guruhi">Rus guruhi</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
