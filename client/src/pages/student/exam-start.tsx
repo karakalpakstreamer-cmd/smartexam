@@ -162,34 +162,36 @@ export default function ExamStartPage() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Shaxsni tasdiqlash
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">To'liq ism</p>
-                <p className="font-semibold">{exam.studentInfo.fullName}</p>
+        {exam.studentInfo && (
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Shaxsni tasdiqlash
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">To'liq ism</p>
+                  <p className="font-semibold">{exam.studentInfo.fullName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ID raqam</p>
+                  <p className="font-semibold font-mono">{exam.studentInfo.userId}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Guruh</p>
+                  <p className="font-semibold">{exam.studentInfo.groupName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Fakultet</p>
+                  <p className="font-semibold">{exam.studentInfo.facultyName}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ID raqam</p>
-                <p className="font-semibold font-mono">{exam.studentInfo.userId}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Guruh</p>
-                <p className="font-semibold">{exam.studentInfo.groupName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fakultet</p>
-                <p className="font-semibold">{exam.studentInfo.facultyName}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mb-6">
           <CardContent className="pt-6">
@@ -229,7 +231,7 @@ export default function ExamStartPage() {
                   data-testid="checkbox-accept-rules"
                 />
                 <label htmlFor="accept-rules" className="text-sm cursor-pointer leading-relaxed">
-                  Men <strong>{exam.studentInfo.fullName}</strong>man va yuqoridagi imtihon qoidalarini o'qib chiqdim, ularga roziman.
+                  Men <strong>{exam.studentInfo?.fullName || "talaba"}</strong>man va yuqoridagi imtihon qoidalarini o'qib chiqdim, ularga roziman.
                 </label>
               </div>
             </div>
