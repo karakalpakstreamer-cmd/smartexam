@@ -1,0 +1,67 @@
+There is a SQL syntax error when student clicks "Imtihonni boshlash" button.
+
+Error message: 400: {"error":"syntax error at or near \"=\""}
+
+This is a database query syntax error. Please find and fix the SQL query that runs when starting an exam.
+
+## WHERE TO LOOK:
+
+The error occurs when the student clicks "Imtihonni boshlash" button. This likely happens in one of these operations:
+
+1. Updating the exam_sessions table to set status = 'in_progress'
+2. Getting the student's assigned ticket
+3. Getting the questions for the ticket
+4. Recording the exam start time
+
+## COMMON SQL SYNTAX MISTAKES TO CHECK:
+
+### Problem 1: Missing quotes around string values
+Wrong: UPDATE exam_sessions SET status = in_progress
+Correct: UPDATE exam_sessions SET status = 'in_progress'
+
+### Problem 2: Using = instead of IS for NULL
+Wrong: WHERE ticket_id = NULL
+Correct: WHERE ticket_id IS NULL
+
+### Problem 3: Missing commas between SET values
+Wrong: UPDATE exam_sessions SET status = 'in_progress' started_at = NOW()
+Correct: UPDATE exam_sessions SET status = 'in_progress', started_at = NOW()
+
+### Problem 4: Wrong parameter placeholder
+Wrong: WHERE id = $ 1 (space before number)
+Correct: WHERE id = $1 (no space)
+
+### Problem 5: Empty or undefined values in query
+Wrong: WHERE student_id = (undefined becomes empty)
+Correct: Make sure student_id is passed correctly
+
+## PLEASE DO THE FOLLOWING:
+
+1. Find the API endpoint that handles POST /api/exams/:id/start or similar
+2. Look at all SQL queries in that function
+3. Check each query for syntax errors
+4. Make sure all string values have quotes
+5. Make sure all parameters are passed correctly
+6. Add console.log to print the actual SQL query being executed
+7. Fix the syntax error
+
+## EXAMPLE OF CORRECT QUERIES:
+
+Starting exam session:
+UPDATE exam_sessions 
+SET status = 'in_progress', started_at = NOW() 
+WHERE exam_id = $1 AND student_id = $2
+
+Getting student's ticket:
+SELECT * FROM exam_tickets 
+WHERE exam_id = $1 AND assigned_to = $2
+
+Getting questions for ticket:
+SELECT q.* FROM questions q 
+WHERE q.id = ANY($1)
+
+## AFTER FIXING:
+
+Test by clicking "Imtihonni boshlash" again. The student should enter the fullscreen exam interface and see the first question.
+
+Please find the exact query with the syntax error and fix it.

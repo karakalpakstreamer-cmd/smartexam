@@ -845,7 +845,7 @@ export const storage: IStorage = {
 
   async startStudentExamSession(studentId: number, examId: number): Promise<any> {
     const [ticket] = await db.select().from(examTickets)
-      .where(and(eq(examTickets.examId, examId), eq(examTickets.studentId, studentId)))
+      .where(and(eq(examTickets.examId, examId), eq(examTickets.assignedTo, studentId)))
       .limit(1);
     
     if (!ticket) {
@@ -883,7 +883,7 @@ export const storage: IStorage = {
 
   async getStudentExamSession(studentId: number, examId: number): Promise<any> {
     const [ticket] = await db.select().from(examTickets)
-      .where(and(eq(examTickets.examId, examId), eq(examTickets.studentId, studentId)))
+      .where(and(eq(examTickets.examId, examId), eq(examTickets.assignedTo, studentId)))
       .limit(1);
     
     if (!ticket) return null;
