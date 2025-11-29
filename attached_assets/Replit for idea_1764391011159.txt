@@ -1,0 +1,1406 @@
+# SmartExam - Replit Core Prompt (Bosqich 1 - To'liq MVP)
+
+```
+Build a complete university examination management system called "SmartExam" with full functionality from login to AI grading.
+
+Tech Stack: React 18 + Vite (frontend), Node.js + Express (backend), PostgreSQL (Replit's built-in), Google Gemini 2.5 Flash API (AI)
+
+===== ENVIRONMENT VARIABLES (Add to Replit Secrets) =====
+
+DATABASE_URL = (Replit auto-provides PostgreSQL)
+SESSION_SECRET = smartexam_secret_key_2024_secure
+GEMINI_API_KEY = AIzaSyBxVQyISglkZ4DSlNMXkndMrrIE_ekx49I
+MAX_FILE_SIZE = 10485760
+NODE_ENV = production
+
+===== COMPLETE USER FLOW =====
+
+FLOW 1: First Time Setup
+→ No users in database → Show setup page → Create Registrator (R001) → Redirect to login
+
+FLOW 2: Registrator Creates Structure
+→ Login as Registrator → Create Fakultet → Create Yo'nalish → Create Guruh → Create Fan → Create O'qituvchi (assign to fan) → Create Talabalar (assign to guruh)
+
+FLOW 3: Teacher Uploads & Creates Exam
+→ Login as O'qituvchi → Go to "Leksiyalar" → Upload PDF/Word → AI auto-generates questions (hidden from teacher) → Go to "Imtihonlar" → Create exam → Select guruhlar → System generates unique tickets
+
+FLOW 4: Student Takes Exam
+→ Login as Talaba → See upcoming exams → Click "Boshlash" at start time → Confirm identity → Enter fullscreen exam → Answer 5 questions → Submit or auto-submit when time ends → AI grades all answers
+
+FLOW 5: Teacher Reviews Results
+→ Login as O'qituvchi → Go to "Natijalar" → See all submissions with AI scores → Review each answer → Confirm or adjust AI score → Export for HEMIS
+
+===== DATABASE SCHEMA =====
+
+-- Run these in order
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(20) UNIQUE NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('registrator', 'oqituvchi', 'talaba')),
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100),
+    password_hash VARCHAR(255) NOT NULL,
+    faculty_id INTEGER,
+    department_id INTEGER,
+    group_id INTEGER,
+    phone VARCHAR(20),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+CREATE TABLE faculties (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    faculty_id INTEGER REFERENCES faculties(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(faculty_id, code)
+);
+
+CREATE TABLE student_groups (
+    id SERIAL PRIMARY KEY,
+    department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
+    name VARCHAR(50) NOT NULL,
+    course_year INTEGER CHECK (course_year BETWEEN 1 AND 4),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE subjects (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    department_id INTEGER REFERENCES departments(id),
+    credits INTEGER DEFAULT 3,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE teacher_subjects (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    UNIQUE(teacher_id, subject_id)
+);
+
+CREATE TABLE lectures (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    teacher_id INTEGER REFERENCES users(id),
+    title VARCHAR(200) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_size INTEGER,
+    file_type VARCHAR(20),
+    content_text TEXT,
+    questions_generated BOOLEAN DEFAULT false,
+    questions_count INTEGER DEFAULT 0,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE questions (
+    id SERIAL PRIMARY KEY,
+    lecture_id INTEGER REFERENCES lectures(id) ON DELETE CASCADE,
+    subject_id INTEGER REFERENCES subjects(id),
+    question_text TEXT NOT NULL,
+    difficulty VARCHAR(20) DEFAULT 'medium',
+    topic VARCHAR(100),
+    max_points DECIMAL(5,2) DEFAULT 3,
+    keywords TEXT[],
+    sample_answer TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_used BOOLEAN DEFAULT false
+);
+
+CREATE TABLE exams (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER REFERENCES users(id),
+    subject_id INTEGER REFERENCES subjects(id),
+    name VARCHAR(200) NOT NULL,
+    exam_type VARCHAR(30) NOT NULL CHECK (exam_type IN ('oraliq', 'joriy', 'yakuniy')),
+    target_groups INTEGER[],
+    questions_per_ticket INTEGER DEFAULT 5,
+    duration_minutes INTEGER DEFAULT 60,
+    points_per_question DECIMAL(5,2) DEFAULT 3,
+    total_points DECIMAL(5,2) DEFAULT 15,
+    exam_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'active', 'completed', 'cancelled')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE exam_tickets (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER REFERENCES exams(id) ON DELETE CASCADE,
+    ticket_number INTEGER NOT NULL,
+    question_ids INTEGER[] NOT NULL,
+    assigned_to INTEGER REFERENCES users(id),
+    UNIQUE(exam_id, ticket_number)
+);
+
+CREATE TABLE exam_sessions (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER REFERENCES exams(id),
+    student_id INTEGER REFERENCES users(id),
+    ticket_id INTEGER REFERENCES exam_tickets(id),
+    status VARCHAR(20) DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'submitted', 'graded', 'disqualified')),
+    started_at TIMESTAMP,
+    submitted_at TIMESTAMP,
+    tab_switches INTEGER DEFAULT 0,
+    warnings INTEGER DEFAULT 0,
+    total_ai_score DECIMAL(5,2),
+    total_final_score DECIMAL(5,2),
+    is_graded BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(exam_id, student_id)
+);
+
+CREATE TABLE student_answers (
+    id SERIAL PRIMARY KEY,
+    session_id INTEGER REFERENCES exam_sessions(id) ON DELETE CASCADE,
+    question_id INTEGER REFERENCES questions(id),
+    answer_text TEXT,
+    ai_score DECIMAL(5,2),
+    ai_feedback JSONB,
+    final_score DECIMAL(5,2),
+    plagiarism_percent DECIMAL(5,2) DEFAULT 0,
+    answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE activity_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER,
+    user_role VARCHAR(20),
+    action VARCHAR(100) NOT NULL,
+    details JSONB,
+    ip_address VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add foreign keys after all tables created
+ALTER TABLE users ADD CONSTRAINT fk_faculty FOREIGN KEY (faculty_id) REFERENCES faculties(id);
+ALTER TABLE users ADD CONSTRAINT fk_department FOREIGN KEY (department_id) REFERENCES departments(id);
+ALTER TABLE users ADD CONSTRAINT fk_group FOREIGN KEY (group_id) REFERENCES student_groups(id);
+
+-- Create indexes for performance
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_user_id ON users(user_id);
+CREATE INDEX idx_questions_subject ON questions(subject_id);
+CREATE INDEX idx_exams_status ON exams(status);
+CREATE INDEX idx_sessions_exam ON exam_sessions(exam_id);
+
+===== DESIGN SYSTEM =====
+
+Colors:
+- Primary: #1E40AF (royal blue)
+- Primary Light: #3B82F6
+- Primary Dark: #1E3A8A
+- Success: #059669 (emerald)
+- Warning: #D97706 (amber)
+- Error: #DC2626 (red)
+- Background: #F1F5F9
+- Card: #FFFFFF
+- Text Primary: #1E293B
+- Text Secondary: #64748B
+- Border: #E2E8F0
+
+Typography:
+- Font: 'Inter', sans-serif (import from Google Fonts with Cyrillic subset)
+- H1: 28px bold, H2: 24px semibold, H3: 20px semibold, H4: 16px medium
+- Body: 14px regular, Small: 12px
+
+Spacing: 4px base unit (4, 8, 12, 16, 24, 32, 48)
+Border Radius: 6px buttons, 8px cards, 12px modals
+Shadows: 
+- sm: 0 1px 2px rgba(0,0,0,0.05)
+- md: 0 4px 6px rgba(0,0,0,0.07)
+- lg: 0 10px 15px rgba(0,0,0,0.1)
+
+ALL TEXT IN UZBEK LANGUAGE!
+
+===== PAGE 1: LOGIN =====
+
+Route: /login (public, redirect if logged in)
+
+Layout: Full viewport height, centered content
+Background: Gradient from #1E40AF to #3B82F6
+
+Card (max-width 420px, white, rounded-xl, shadow-lg, p-8):
+
+Logo Section:
+- SmartExam icon (shield + checkmark) 48px
+- "SmartExam" text, 24px bold, primary color
+- Tagline: "Adolatli imtihon tizimi" 14px, gray
+
+Form:
+- Title: "Tizimga kirish" 20px semibold, center
+
+Role Selector (3 cards in row, mb-6):
+- Each card: 100px width, p-3, border, rounded-lg, cursor-pointer
+- Icon (24px) + Label (12px) centered vertically
+- Cards: 
+  * Registrator (shield-check icon)
+  * O'qituvchi (book-open icon)
+  * Talaba (user-graduate icon)
+- Selected: border-primary, bg-primary/5
+- Hover: border-primary/50
+
+Inputs:
+- ID field: placeholder "ID raqamingiz", left icon (user)
+- Password field: placeholder "Parol", left icon (lock), right toggle (eye/eye-off)
+- Both: h-11, border, rounded-lg, focus:ring-2 focus:ring-primary
+
+Button: "Kirish" full width, h-11, bg-primary, text-white, rounded-lg, hover:bg-primary-dark
+
+Error message: Red text below button if login fails
+
+Footer: "Texnik yordam: support@smartexam.uz" text-xs, gray, mt-8
+
+===== PAGE 2: INITIAL SETUP (First Time Only) =====
+
+Route: /setup (only if no users exist)
+
+Same card style as login:
+- Title: "SmartExam - Boshlang'ich sozlash"
+- Subtitle: "Birinchi Registrator hisobini yarating"
+
+Form fields:
+- Registrator ID: "R001" (readonly, auto-filled)
+- F.I.O.: required
+- Email: optional
+- Telefon: optional
+- Parol: required, min 6 chars, show strength indicator
+- Parolni tasdiqlang: must match
+
+Button: "Tizimni ishga tushirish"
+
+On success: Redirect to /login with success toast
+
+===== REGISTRATOR DASHBOARD =====
+
+Route: /registrator/* (protected, role: registrator)
+
+Layout:
+- Sidebar: 260px width, fixed left, h-screen, bg-slate-900, text-white
+- Main: ml-260px, bg-slate-100, min-h-screen, p-6
+
+Sidebar Content:
+- Logo: SmartExam icon + text, p-4, border-b border-slate-700
+- User info: Avatar circle (initials), name, "Registrator" badge, p-4
+- Navigation (py-2 each, px-4, rounded-lg mx-2):
+  * Bosh sahifa - LayoutDashboard icon - /registrator
+  * Fakultetlar - Building2 icon - /registrator/fakultetlar
+  * Yo'nalishlar - FolderTree icon - /registrator/yonalishlar
+  * Guruhlar - Users icon - /registrator/guruhlar
+  * Fanlar - BookOpen icon - /registrator/fanlar
+  * O'qituvchilar - GraduationCap icon - /registrator/oqituvchilar
+  * Talabalar - UserCircle icon - /registrator/talabalar
+  * Monitoring - Activity icon - /registrator/monitoring
+  * Sozlamalar - Settings icon - /registrator/sozlamalar
+- Active item: bg-slate-700
+- Hover: bg-slate-800
+- Logout button at bottom: LogOut icon, "Chiqish", border-t
+
+Top Bar (in main area):
+- h-16, bg-white, shadow-sm, flex items-center justify-between, px-6
+- Left: Page title (breadcrumb style)
+- Right: Notification bell, User dropdown (Profil, Chiqish)
+
+===== REGISTRATOR: Bosh sahifa =====
+
+Route: /registrator
+
+Stats Cards Row (4 cards, grid cols-4, gap-6):
+Card template: bg-white, rounded-xl, p-6, shadow-sm
+- Icon (40px circle with bg), Title (text-sm gray), Value (text-2xl bold), subtitle
+
+Cards:
+1. Fakultetlar - Building2 icon, blue bg - count - "ta fakultet"
+2. O'qituvchilar - GraduationCap icon, green bg - count - "ta o'qituvchi"
+3. Talabalar - Users icon, purple bg - count - "ta talaba"
+4. Faol imtihonlar - ClipboardCheck icon, orange bg - count - with pulse dot if > 0
+
+Recent Activity Section (mt-6):
+- Card with title "So'nggi faoliyat"
+- List of last 10 activities from activity_logs
+- Each: icon, action text, time ago, user badge
+
+Upcoming Exams Section:
+- Card with title "Yaqinlashayotgan imtihonlar"
+- Table: Fan, O'qituvchi, Sana, Vaqt, Guruhlar, Holat badge
+
+===== REGISTRATOR: Fakultetlar =====
+
+Route: /registrator/fakultetlar
+
+Header Row: 
+- Title: "Fakultetlar"
+- Button: "+ Fakultet qo'shish" primary
+
+Table (bg-white, rounded-xl, overflow-hidden):
+- Columns: Kod, Fakultet nomi, Yo'nalishlar, O'qituvchilar, Talabalar, Harakatlar
+- Rows: hover:bg-slate-50
+- Actions: Edit (pencil), Delete (trash) icon buttons
+- Empty state: illustration + "Hozircha fakultet yo'q" + button
+
+Add/Edit Modal:
+- Title: "Fakultet qo'shish" or "Fakultetni tahrirlash"
+- Fields:
+  * Fakultet nomi* (input)
+  * Kod* (input, uppercase, e.g., "IQTISOD")
+- Buttons: "Bekor qilish" (outline), "Saqlash" (primary)
+
+===== REGISTRATOR: Yo'nalishlar =====
+
+Route: /registrator/yonalishlar
+
+Header: Title + Filter dropdown (Fakultet) + "+ Yo'nalish qo'shish" button
+
+Table Columns: Kod, Yo'nalish nomi, Fakultet, Guruhlar soni, Harakatlar
+
+Add Modal Fields:
+- Fakultet* (select dropdown)
+- Yo'nalish nomi*
+- Kod*
+
+===== REGISTRATOR: Guruhlar =====
+
+Route: /registrator/guruhlar
+
+Header: Title + Filters (Fakultet, Yo'nalish, Kurs dropdowns) + "+ Guruh qo'shish"
+
+Table: Guruh nomi, Yo'nalish, Fakultet, Kurs, Talabalar soni, Harakatlar
+
+Add Modal:
+- Fakultet* (select) → loads Yo'nalishlar
+- Yo'nalish* (select)
+- Guruh nomi* (e.g., "101-guruh")
+- Kurs* (radio: 1, 2, 3, 4)
+
+===== REGISTRATOR: Fanlar =====
+
+Route: /registrator/fanlar
+
+Table: Kod, Fan nomi, Yo'nalish, Fakultet, Kreditlar, O'qituvchilar, Harakatlar
+
+Add Modal:
+- Fan nomi*
+- Kod* (e.g., "MAT101")
+- Fakultet* → Yo'nalish* (cascading)
+- Kreditlar (number, default 3)
+
+===== REGISTRATOR: O'qituvchilar =====
+
+Route: /registrator/oqituvchilar
+
+Header: "+ O'qituvchi qo'shish" button, Filters (Fakultet, Yo'nalish)
+
+Table: ID, F.I.O., Fakultet, Yo'nalish, Telefon, Fanlar (badges), Holat, Harakatlar
+
+Harakatlar dropdown: Ko'rish, Tahrirlash, Parol yangilash, O'chirish
+
+Add Modal (larger, 2 columns):
+- Left column:
+  * O'qituvchi ID* (auto: "T" + year + 4 digits, e.g., T20240001, editable)
+  * F.I.O.*
+  * Email
+  * Telefon
+- Right column:
+  * Fakultet* (select)
+  * Yo'nalish* (select, filtered)
+  * Fanlar (multi-select checkboxes of subjects in that yo'nalish)
+- Password section:
+  * "Avtomatik parol" checkbox (checked by default)
+  * If unchecked: password input
+  * Generated password display with COPY button
+
+On Save Success:
+- Modal showing credentials:
+  * "O'qituvchi muvaffaqiyatli qo'shildi!"
+  * ID: T20240001
+  * Parol: Ab3kL9xQ
+  * "Nusxalash" button (copies both)
+  * "Yopish" button
+
+Password Reset Modal:
+- Confirmation: "T20240001 - [Name] parolini yangilash"
+- New auto-generated password shown
+- "Yangilash" button
+
+===== REGISTRATOR: Talabalar =====
+
+Route: /registrator/talabalar
+
+Header: "+ Talaba qo'shish", "Excel import" button, Filters
+
+Table: ID, F.I.O., Guruh, Kurs, Fakultet, Yo'nalish, Holat, Harakatlar
+
+Add Modal:
+- Talaba ID* (auto: "S" + year + 4 digits)
+- F.I.O.*
+- Email (optional)
+- Fakultet* → Yo'nalish* → Guruh* (cascading selects)
+- Kurs (auto-filled from group)
+- Password: auto-generate with copy
+
+Bulk Add Section (in modal or separate):
+- "Bir nechta talaba qo'shish"
+- Textarea: "Har bir qatorda: F.I.O."
+- System auto-generates IDs and passwords
+- Results table showing all credentials
+
+===== REGISTRATOR: Monitoring =====
+
+Route: /registrator/monitoring
+
+Tabs: Faol imtihonlar, Barcha imtihonlar
+
+Active Exams Grid:
+- Card for each active exam:
+  * Subject name, Teacher
+  * Progress: "45/60 talaba"
+  * Progress bar
+  * "Monitoring" button → opens detailed view
+
+===== O'QITUVCHI DASHBOARD =====
+
+Route: /oqituvchi/* (protected, role: oqituvchi)
+
+Sidebar (bg-blue-900):
+- Same structure as Registrator
+- Navigation:
+  * Bosh sahifa - /oqituvchi
+  * Mening fanlarim - /oqituvchi/fanlar
+  * Leksiyalar - /oqituvchi/leksiyalar
+  * Imtihonlar - /oqituvchi/imtihonlar
+  * Natijalar - /oqituvchi/natijalar
+  * Profil - /oqituvchi/profil
+
+===== O'QITUVCHI: Bosh sahifa =====
+
+Welcome Section:
+- "Salom, [Name]!" h2
+- Today's date
+
+Stats Row (3 cards):
+- Mening fanlarim: [count]
+- Yuklangan leksiyalar: [count]
+- Bugungi imtihonlar: [count]
+
+Today's Exams:
+- Cards for exams scheduled today
+- Each: Subject, Time, Groups, Status badge
+- "Boshlash" or "Monitoring" button based on status
+
+Quick Actions:
+- "Leksiya yuklash" button
+- "Imtihon yaratish" button
+
+===== O'QITUVCHI: Mening fanlarim =====
+
+Grid of subject cards (teacher's assigned subjects):
+- Card: Subject name, code, department
+- Stats: Leksiyalar: X, Savollar: Y (hidden count)
+- "Leksiyalar" button → navigates to lectures filtered by subject
+
+===== O'QITUVCHI: Leksiyalar (CRITICAL) =====
+
+Route: /oqituvchi/leksiyalar
+
+Header:
+- Title: "Leksiyalar"
+- Subject filter dropdown (teacher's subjects only)
+
+Upload Section (card, dashed border):
+- Drag-drop zone: "PDF yoki Word faylni shu yerga tashlang"
+- "yoki" text
+- "Faylni tanlash" button
+- Constraints: "Maksimum 10MB • PDF, DOCX"
+- Title input: "Leksiya nomi"
+- "Yuklash" button (disabled until file selected)
+
+Upload Progress:
+- Show progress bar during upload
+- After upload: "Savollar yaratilmoqda..." with spinner
+- On complete: "✓ [X] ta savol yaratildi" (teacher sees count only, not questions!)
+
+Lectures List:
+- Cards for each uploaded lecture
+- Card content:
+  * File icon (PDF/Word)
+  * Title
+  * File name, size
+  * Upload date
+  * Status badge: "Tayyor ✓" or "Jarayonda..."
+  * Questions count badge (e.g., "23 ta savol")
+  * Delete button (with confirmation)
+
+BACKEND LOGIC for Upload:
+
+1. Save file to /uploads folder
+2. Extract text:
+   - PDF: use pdf-parse library
+   - DOCX: use mammoth library
+3. Save lecture record with content_text
+4. Call Gemini API to generate questions:
+
+```javascript
+const generateQuestions = async (lectureId, contentText, subjectId) => {
+  const prompt = `Sen SmartExam tizimi uchun imtihon savollari yaratuvchi AI assistantisan.
+
+Quyidagi leksiya matnidan 15-20 ta imtihon savoli yarat.
+
+MUHIM QOIDALAR:
+1. Savollar O'ZBEK TILIDA bo'lsin
+2. Talabaning TUSHUNISHINI tekshirsin (faqat yodlash emas)
+3. Har xil qiyinlik: 5 ta oson, 10 ta o'rta, 5 ta qiyin
+4. Har bir savol aniq va tushunarli bo'lsin
+5. Har bir savolga to'liq namuna javob yoz
+6. 3-5 ta kalit so'z (keywords) ber - baholashda ishlatiladi
+
+LEKSIYA MATNI:
+${contentText.substring(0, 15000)}
+
+JAVOBNI FAQAT JSON FORMATDA BER, BOSHQA HECH NARSA YO'Q:
+{
+  "questions": [
+    {
+      "question_text": "Savol matni bu yerda",
+      "difficulty": "easy",
+      "topic": "Mavzu nomi",
+      "keywords": ["kalit1", "kalit2", "kalit3"],
+      "sample_answer": "To'liq namuna javob bu yerda. Kamida 2-3 gap bo'lsin."
+    }
+  ]
+}`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8000,
+        }
+      })
+    }
+  );
+
+  const data = await response.json();
+  const text = data.candidates[0].content.parts[0].text;
+  
+  // Parse JSON from response
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const parsed = JSON.parse(jsonMatch[0]);
+  
+  // Save questions to database
+  for (const q of parsed.questions) {
+    await db.query(
+      `INSERT INTO questions (lecture_id, subject_id, question_text, difficulty, topic, keywords, sample_answer, max_points)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 3)`,
+      [lectureId, subjectId, q.question_text, q.difficulty, q.topic, q.keywords, q.sample_answer]
+    );
+  }
+  
+  // Update lecture record
+  await db.query(
+    `UPDATE lectures SET questions_generated = true, questions_count = $1 WHERE id = $2`,
+    [parsed.questions.length, lectureId]
+  );
+};
+```
+
+IMPORTANT: Teacher NEVER sees the actual questions! Only the count.
+
+===== O'QITUVCHI: Imtihonlar =====
+
+Route: /oqituvchi/imtihonlar
+
+Header: "+ Yangi imtihon" button
+
+Tabs: Qoralamalar | Rejalashtirilgan | Faol | Yakunlangan
+
+Exam Cards:
+- Subject, Exam name
+- Type badge (Oraliq/Joriy/Yakuniy)
+- Date, Time
+- Groups (badges)
+- Status badge
+- Actions based on status:
+  * Draft: Edit, Delete, "Rejalashtirish"
+  * Scheduled: Edit, Cancel, "Boshlash" (if time reached)
+  * Active: "Monitoring"
+  * Completed: "Natijalar"
+
+===== Create Exam Flow =====
+
+Route: /oqituvchi/imtihonlar/yaratish
+
+Multi-step form (3 steps with progress indicator):
+
+STEP 1 - Asosiy ma'lumotlar:
+- Imtihon nomi* (input)
+- Fan* (select - teacher's subjects)
+- Imtihon turi* (radio cards):
+  * Oraliq nazorat
+  * Joriy nazorat
+  * Yakuniy nazorat
+- Guruhlar* (checkboxes - groups related to subject's department)
+- Sana* (date picker, min: today)
+- Boshlanish vaqti* (time picker)
+- Davomiyligi* (select: 30, 45, 60, 90, 120 daqiqa) - default 60
+- "Keyingi" button
+
+STEP 2 - Savol sozlamalari:
+
+Info Card (blue bg):
+- "Bu fan uchun jami: [X] ta savol mavjud"
+- If X < required: Warning card (red) "Savollar yetarli emas! Kamida [Y] ta savol kerak. Ko'proq leksiya yuklang."
+
+Settings:
+- Har bir biletda savollar soni: 5 (fixed, readonly)
+- Har bir savol uchun ball: (input, default 3)
+- Jami ball: (auto-calculated, readonly) = 5 × points_per_question
+
+Algorithm Explanation Card:
+- "Har bir talabaga 5 ta NOYOB savol beriladi"
+- "Savollar takrorlanmaydi"
+- "Minimum kerakli savollar: Talabalar soni × 4"
+
+Student Count Display:
+- "Tanlangan guruhlarda jami: [X] ta talaba"
+
+Validation:
+- total_questions >= student_count * 4
+- If not enough: Block proceeding, show error
+
+"Orqaga" and "Keyingi" buttons
+
+STEP 3 - Ko'rib chiqish:
+
+Summary Card:
+- Imtihon: [name]
+- Fan: [subject]
+- Tur: [type badge]
+- Guruhlar: [group badges]
+- Sana va vaqt: [date] [time]
+- Davomiyligi: [duration] daqiqa
+- Savollar: 5 ta / bilet
+- Ball: [points] × 5 = [total]
+- Talabalar soni: [count]
+
+Buttons: "Orqaga", "Qoralama saqlash", "Imtihonni yaratish"
+
+ON CREATE:
+
+```javascript
+const createExam = async (examData) => {
+  // 1. Create exam record
+  const exam = await db.query(
+    `INSERT INTO exams (...) VALUES (...) RETURNING id`
+  );
+  
+  // 2. Get all questions for this subject
+  const questions = await db.query(
+    `SELECT id FROM questions WHERE subject_id = $1 ORDER BY RANDOM()`,
+    [examData.subject_id]
+  );
+  
+  // 3. Get all students in target groups
+  const students = await db.query(
+    `SELECT id FROM users WHERE role = 'talaba' AND group_id = ANY($1)`,
+    [examData.target_groups]
+  );
+  
+  // 4. Generate unique tickets for each student
+  const questionIds = questions.rows.map(q => q.id);
+  const usedQuestions = new Set();
+  
+  for (let i = 0; i < students.rows.length; i++) {
+    // Get 5 unique questions not used in other tickets
+    const ticketQuestions = [];
+    for (const qId of questionIds) {
+      if (!usedQuestions.has(qId) && ticketQuestions.length < 5) {
+        ticketQuestions.push(qId);
+        usedQuestions.add(qId);
+      }
+    }
+    
+    // If we run out of unique questions, shuffle and reuse
+    if (ticketQuestions.length < 5) {
+      const remaining = questionIds.filter(id => !ticketQuestions.includes(id));
+      shuffleArray(remaining);
+      while (ticketQuestions.length < 5 && remaining.length > 0) {
+        ticketQuestions.push(remaining.pop());
+      }
+    }
+    
+    // Create ticket
+    await db.query(
+      `INSERT INTO exam_tickets (exam_id, ticket_number, question_ids, assigned_to)
+       VALUES ($1, $2, $3, $4)`,
+      [exam.rows[0].id, i + 1, ticketQuestions, students.rows[i].id]
+    );
+    
+    // Create session
+    await db.query(
+      `INSERT INTO exam_sessions (exam_id, student_id, ticket_id, status)
+       VALUES ($1, $2, (SELECT id FROM exam_tickets WHERE exam_id = $1 AND ticket_number = $2), 'not_started')`,
+      [exam.rows[0].id, students.rows[i].id, i + 1]
+    );
+  }
+  
+  // 5. Update exam status
+  await db.query(
+    `UPDATE exams SET status = 'scheduled' WHERE id = $1`,
+    [exam.rows[0].id]
+  );
+};
+```
+
+===== O'QITUVCHI: Exam Monitoring =====
+
+Route: /oqituvchi/imtihonlar/:id/monitoring
+
+Full-width layout (no sidebar padding):
+
+Header Bar (sticky):
+- Back arrow
+- Exam name + Subject
+- Large countdown timer (centered)
+  * Green when > 10 min
+  * Yellow when 5-10 min
+  * Red when < 5 min, pulsing
+- "Tugatish" button (danger, with confirmation)
+
+Stats Bar:
+- Jami: [X] talaba
+- Boshlagan: [Y]
+- Topshirgan: [Z]
+- Muammoli: [W] (red if > 0)
+
+Main Content (2 columns):
+
+Left (70%) - Students Grid:
+- Card for each student:
+  * Avatar (initials)
+  * Name
+  * Group badge
+  * Status indicator:
+    - Gray: "Kutmoqda" (not started)
+    - Blue pulse: "Yozmoqda" (in progress)
+    - Green check: "Topshirdi"
+    - Red: "Chetlashtirildi"
+  * Progress: "3/5 savol"
+  * Time: "15:32"
+  * Warning badge if tab_switches > 0
+
+Right (30%) - Alerts Panel:
+- Title: "Ogohlantirishlar"
+- Real-time list:
+  * "[Name] imtihonni boshladi" - time
+  * "[Name] sahifadan chiqdi (1/3)" - time, yellow
+  * "[Name] sahifadan chiqdi (3/3) - CHETLASHTIRILDI" - time, red
+  * "[Name] imtihonni topshirdi" - time, green
+
+Auto-refresh every 5 seconds
+
+===== O'QITUVCHI: Natijalar =====
+
+Route: /oqituvchi/natijalar
+
+Exam Selector: Dropdown of completed exams
+
+Results Table:
+- Columns: #, Talaba, Guruh, Boshlagan, Topshirgan, Vaqt, AI ball, Yakuniy ball, Plagiat, Holat, Harakatlar
+- Holat badges:
+  * "Tekshirilmagan" - yellow
+  * "Tekshirildi" - green
+  * "Muammoli" - red
+- Harakatlar: "Tekshirish" button
+
+Summary Stats:
+- O'rtacha ball: [X]
+- Eng yuqori: [X]
+- Eng past: [X]
+- Topshirganlar: [X]/[Y]
+
+Export Button: "HEMIS uchun eksport" → downloads CSV
+
+===== O'QITUVCHI: Grading View (CRITICAL) =====
+
+Route: /oqituvchi/natijalar/:sessionId
+
+Layout: Split view
+
+Left Panel (300px, fixed):
+- Student Card:
+  * Avatar
+  * Name
+  * ID
+  * Group
+- Stats:
+  * Boshlagan: [time]
+  * Topshirgan: [time]
+  * Sarflangan vaqt: [X] daqiqa
+  * Tab almashishlar: [X]
+- Overall Score:
+  * AI ball: [X]/15
+  * Yakuniy ball: [input]/15
+- Navigation:
+  * "Oldingi talaba" button
+  * "Keyingi talaba" button
+- Actions:
+  * "Saqlash" button (primary)
+  * "Saqlash va keyingi" button
+
+Right Panel (scrollable):
+- Question Cards (accordion style, all expanded by default):
+
+Question Card:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Savol 1                                           3 ball    │
+├─────────────────────────────────────────────────────────────┤
+│ [Question text here - full text, read-only]                 │
+├─────────────────────────────────────────────────────────────┤
+│ Talaba javobi:                                              │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ [Student's answer text - read-only, gray background]    │ │
+│ │ Lorem ipsum dolor sit amet, consectetur adipiscing...   │ │
+│ └─────────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│ AI Tahlili:                                    AI ball: 2.5 │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ ✓ Mavzuga mosligi: Javob savolga mos                    │ │
+│ │ ✓ To'liqlik: Asosiy fikrlar bor                         │ │
+│ │ ✗ Aniqlik: Ba'zi tushunchalar noaniq                    │ │
+│ │ ✓ Kalit tushunchalar: 3/4 kalit so'z ishlatilgan        │ │
+│ │ ✓ Mantiqiy izchillik: Fikrlar ketma-ket                 │ │
+│ │                                                          │ │
+│ │ Plagiat: 8% (Normal ✓)                                  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│ Yakuniy ball: [2.5____] / 3          [AI ballni qo'llash]  │
+│ Izoh: [________________________________]                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+===== TALABA DASHBOARD =====
+
+Route: /talaba/* (protected, role: talaba)
+
+Simple Layout:
+- Top navbar only (no sidebar)
+- Logo left, Navigation center, Profile right
+
+Navigation:
+- Bosh sahifa
+- Imtihonlar
+
+===== TALABA: Bosh sahifa =====
+
+Welcome Card:
+- "Salom, [Name]!"
+- Group, Course, Faculty info
+- Today's date
+
+Alert Section (if exam within 24 hours):
+- Yellow/orange card
+- "Ertaga imtihon: [Subject]"
+- Time and duration
+- "Ko'rish" button
+
+Upcoming Exams:
+- Cards for upcoming exams (next 7 days)
+- Subject, Date, Time, Duration
+- Countdown if within 24h
+
+===== TALABA: Imtihonlar =====
+
+Route: /talaba/imtihonlar
+
+Tabs: Yaqinlashayotgan | O'tkazilgan
+
+Upcoming Exam Card:
+```
+┌──────────────────────────────────────────────────────────────┐
+│  📚 Matematika                                    [Oraliq]   │
+├──────────────────────────────────────────────────────────────┤
+│  O'qituvchi: Karimov A.B.                                    │
+│  Sana: 15-yanvar 2024                                        │
+│  Vaqt: 09:00                                                 │
+│  Davomiyligi: 60 daqiqa                                      │
+│  Savollar: 5 ta                                              │
+├──────────────────────────────────────────────────────────────┤
+│  ⏰ 2 soat 15 daqiqa qoldi                                   │
+│                                                              │
+│  [Batafsil ▼]                     [Imtihonni boshlash]      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+"Batafsil" expands to show rules:
+- Imtihon qoidalari ro'yxati
+- Tab almashish ogohlantirishi
+- Copy-paste bloklanganligi
+
+"Imtihonni boshlash" button:
+- Disabled if current time < exam start_time
+- Enabled when exam is active
+- Shows "Vaqt boshlanmadi" if disabled
+
+===== TALABA: Pre-Exam Screen =====
+
+Route: /talaba/imtihon/:id/boshlash
+
+Full screen, centered card:
+
+Step 1 - Identity Confirmation:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Shaxsni tasdiqlash                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│              [Avatar/Photo placeholder]                      │
+│                                                              │
+│                   Aliyev Vali Karimovich                     │
+│                   S20240015                                  │
+│                   101-guruh • 2-kurs                         │
+│                   Iqtisodiyot fakulteti                      │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│                    Imtihon qoidalari:                        │
+│                                                              │
+│  ⏱️  Imtihon vaqti: 60 daqiqa                               │
+│  ❌  Sahifadan chiqish ta'qiqlanadi                         │
+│  📋  Copy-paste bloklangan                                   │
+│  ⚠️  3 marta ogohlantirish = chetlashtirish                │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│  ☑️  Men Aliyev Vali Karimovichman va imtihon              │
+│      qoidalariga roziman                                     │
+│                                                              │
+│              [Tasdiqlash va boshlash]                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Checkbox must be checked to enable button.
+
+On click: 
+1. Request fullscreen
+2. Update session status to 'in_progress'
+3. Redirect to exam interface
+
+===== TALABA: Active Exam Interface (MOST CRITICAL) =====
+
+Route: /talaba/imtihon/:id
+
+FULLSCREEN, NO ESCAPE, MAXIMUM SECURITY
+
+Layout:
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Matematika                           ⏱️ 45:32                 [Tugatish]│
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Savol 2 / 5                                                   (3 ball)  │
+│  ─────────────────────────────────────────────────────────────────────   │
+│                                                                          │
+│  Integral tushunchasini ta'riflang va uning geometrik ma'nosini          │
+│  tushuntiring. Aniq va noaniq integrallar orasidagi farqni misol         │
+│  bilan izohlang.                                                         │
+│                                                                          │
+│  ─────────────────────────────────────────────────────────────────────   │
+│                                                                          │
+│  Javobingiz:                                                             │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                                                                    │   │
+│  │  Integral - bu matematik tahlilning asosiy tushunchalaridan       │   │
+│  │  biri bo'lib, u funksiyaning ma'lum oraliqda yig'indisini         │   │
+│  │  ifodalaydi...                                                     │   │
+│  │                                                                    │   │
+│  │                                                                    │   │
+│  │                                                                    │   │
+│  │                                                                    │   │
+│  └───────────────────────────────────────────────────────────────────┘   │
+│                                                      Saqlandi ✓ 45:30    │
+│                                                      256 ta belgi        │
+│                                                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│     [◀ Oldingi]      ○ ● ○ ○ ○      [Keyingi ▶]                        │
+│                      1 2 3 4 5                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Question dots legend:
+- ○ Empty (outline only) - no answer yet
+- ◐ Yellow fill - has some text
+- ● Green fill - answered (>50 chars)
+- Current question: larger, blue border
+
+Timer behavior:
+- Green: > 10 minutes
+- Yellow: 5-10 minutes  
+- Red + pulse: < 5 minutes
+- At 2 min: Toast "2 daqiqa qoldi!"
+- At 0: Auto-submit
+
+Textarea:
+- Placeholder: "Javobingizni shu yerga yozing..."
+- Auto-save every 30 seconds
+- Show "Saqlandi ✓" with timestamp
+- Character count
+- Min-height: 200px, resizable vertically
+
+SECURITY IMPLEMENTATIONS:
+
+```javascript
+// 1. Disable copy-paste
+useEffect(() => {
+  const preventDefault = (e) => e.preventDefault();
+  document.addEventListener('copy', preventDefault);
+  document.addEventListener('paste', preventDefault);
+  document.addEventListener('cut', preventDefault);
+  document.addEventListener('contextmenu', preventDefault);
+  
+  return () => {
+    document.removeEventListener('copy', preventDefault);
+    document.removeEventListener('paste', preventDefault);
+    document.removeEventListener('cut', preventDefault);
+    document.removeEventListener('contextmenu', preventDefault);
+  };
+}, []);
+
+// 2. Tab switch detection
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      incrementWarning();
+    }
+  };
+  
+  const handleBlur = () => {
+    incrementWarning();
+  };
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('blur', handleBlur);
+  
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('blur', handleBlur);
+  };
+}, []);
+
+const incrementWarning = async () => {
+  const newCount = tabSwitches + 1;
+  setTabSwitches(newCount);
+  
+  // Update in database
+  await api.post(`/exams/${examId}/warning`, { count: newCount });
+  
+  if (newCount >= 3) {
+    // Disqualify
+    await submitExam(true); // true = disqualified
+    setDisqualified(true);
+  } else {
+    // Show warning modal
+    setShowWarningModal(true);
+  }
+};
+
+// 3. Auto-save
+useEffect(() => {
+  const interval = setInterval(() => {
+    if (currentAnswer.trim()) {
+      saveAnswer(currentQuestionId, currentAnswer);
+    }
+  }, 30000); // Every 30 seconds
+  
+  return () => clearInterval(interval);
+}, [currentAnswer, currentQuestionId]);
+
+// 4. Timer countdown
+useEffect(() => {
+  const interval = setInterval(() => {
+    setTimeRemaining(prev => {
+      if (prev <= 1) {
+        submitExam();
+        return 0;
+      }
+      if (prev === 120) {
+        toast.warning("2 daqiqa qoldi!");
+      }
+      return prev - 1;
+    });
+  }, 1000);
+  
+  return () => clearInterval(interval);
+}, []);
+```
+
+Warning Modal:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ⚠️ OGOHLANTIRISH!                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│           Siz imtihon sahifasidan chiqdingiz!               │
+│                                                              │
+│              Bu sizning 2 / 3 ogohlantirishingiz             │
+│                                                              │
+│    Yana 1 marta sahifadan chiqsangiz, imtihondan            │
+│    chetlashtirilasiz!                                        │
+│                                                              │
+│                    [Davom etish]                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+"Tugatish" Confirmation Modal:
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Imtihonni tugatmoqchimisiz?                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   📊 Javoblangan savollar: 4 / 5                            │
+│                                                              │
+│   ⚠️ Bu amalni qaytarib bo'lmaydi!                          │
+│                                                              │
+│         [Bekor qilish]        [Tugatish]                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+===== EXAM SUBMISSION & AI GRADING =====
+
+When student submits (or auto-submit):
+
+```javascript
+const submitExam = async (isDisqualified = false) => {
+  // 1. Update session
+  await db.query(
+    `UPDATE exam_sessions 
+     SET status = $1, submitted_at = NOW() 
+     WHERE id = $2`,
+    [isDisqualified ? 'disqualified' : 'submitted', sessionId]
+  );
+  
+  // 2. Get all answers for this session
+  const answers = await db.query(
+    `SELECT sa.*, q.question_text, q.keywords, q.sample_answer, q.max_points
+     FROM student_answers sa
+     JOIN questions q ON sa.question_id = q.id
+     WHERE sa.session_id = $1`,
+    [sessionId]
+  );
+  
+  // 3. Grade each answer with AI
+  let totalAiScore = 0;
+  
+  for (const answer of answers.rows) {
+    const gradeResult = await gradeWithAI(answer);
+    
+    await db.query(
+      `UPDATE student_answers 
+       SET ai_score = $1, ai_feedback = $2, plagiarism_percent = $3
+       WHERE id = $4`,
+      [gradeResult.score, gradeResult.feedback, gradeResult.plagiarism, answer.id]
+    );
+    
+    totalAiScore += gradeResult.score;
+  }
+  
+  // 4. Update session with total AI score
+  await db.query(
+    `UPDATE exam_sessions SET total_ai_score = $1 WHERE id = $2`,
+    [totalAiScore, sessionId]
+  );
+};
+
+const gradeWithAI = async (answer) => {
+  const prompt = `Sen SmartExam tizimi uchun talaba javoblarini baholovchi AI assistantisan.
+
+VAZIFA: Quyidagi savolga berilgan javobni 5 ta mezon bo'yicha bahola.
+
+SAVOL:
+${answer.question_text}
+
+KALIT SO'ZLAR (bu so'zlar javobda bo'lishi kerak):
+${answer.keywords.join(', ')}
+
+NAMUNA JAVOB (ideal javob):
+${answer.sample_answer}
+
+TALABA JAVOBI:
+${answer.answer_text || "(Javob berilmagan)"}
+
+MAKSIMAL BALL: ${answer.max_points}
+
+BAHOLASH MEZONLARI:
+1. Mavzuga mosligi - Javob savolga tegishlimi?
+2. To'liqlik - Savol to'liq javoblanganmi?
+3. Aniqlik - Javob aniq va tushunarli mi?
+4. Kalit tushunchalar - Muhim atamalar ishlatilganmi?
+5. Mantiqiy izchillik - Fikrlar ketma-ket va mantiqiymi?
+
+JAVOBNI FAQAT JSON FORMATDA BER:
+{
+  "score": 2.5,
+  "max_score": ${answer.max_points},
+  "criteria": {
+    "relevance": {"passed": true, "comment": "Izoh"},
+    "completeness": {"passed": true, "comment": "Izoh"},
+    "clarity": {"passed": false, "comment": "Izoh"},
+    "keywords": {"passed": true, "found": ["kalit1", "kalit2"], "missing": ["kalit3"]},
+    "logic": {"passed": true, "comment": "Izoh"}
+  },
+  "overall_feedback": "Umumiy baho izohi",
+  "plagiarism_indicators": []
+}`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3 }
+      })
+    }
+  );
+
+  const data = await response.json();
+  const text = data.candidates[0].content.parts[0].text;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const result = JSON.parse(jsonMatch[0]);
+  
+  return {
+    score: result.score,
+    feedback: result,
+    plagiarism: 0 // Simplified for MVP
+  };
+};
+```
+
+===== Exam Success Screen =====
+
+After submission:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│                         ✓                                   │
+│                                                              │
+│            Imtihon muvaffaqiyatli topshirildi!              │
+│                                                              │
+│            Topshirilgan vaqt: 10:45:32                       │
+│            Javoblangan savollar: 5 / 5                       │
+│                                                              │
+│    Natijalar o'qituvchi tomonidan tekshirilgandan           │
+│    so'ng e'lon qilinadi.                                     │
+│                                                              │
+│                   [Bosh sahifaga]                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+===== FILE STRUCTURE =====
+
+/smartexam
+├── client/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ui/ (Button, Input, Card, Modal, Table, etc.)
+│   │   │   ├── layout/ (Sidebar, Navbar, PageHeader)
+│   │   │   └── shared/ (LoadingSpinner, EmptyState, StatusBadge)
+│   │   ├── pages/
+│   │   │   ├── auth/
+│   │   │   │   ├── Login.jsx
+│   │   │   │   └── Setup.jsx
+│   │   │   ├── registrator/
+│   │   │   │   ├── Dashboard.jsx
+│   │   │   │   ├── Faculties.jsx
+│   │   │   │   ├── Departments.jsx
+│   │   │   │   ├── Groups.jsx
+│   │   │   │   ├── Subjects.jsx
+│   │   │   │   ├── Teachers.jsx
+│   │   │   │   ├── Students.jsx
+│   │   │   │   └── Monitoring.jsx
+│   │   │   ├── teacher/
+│   │   │   │   ├── Dashboard.jsx
+│   │   │   │   ├── MySubjects.jsx
+│   │   │   │   ├── Lectures.jsx
+│   │   │   │   ├── Exams.jsx
+│   │   │   │   ├── CreateExam.jsx
+│   │   │   │   ├── ExamMonitoring.jsx
+│   │   │   │   ├── Results.jsx
+│   │   │   │   └── GradingView.jsx
+│   │   │   └── student/
+│   │   │       ├── Dashboard.jsx
+│   │   │       ├── Exams.jsx
+│   │   │       ├── PreExam.jsx
+│   │   │       └── ActiveExam.jsx
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── hooks/
+│   │   │   ├── useAuth.js
+│   │   │   └── useApi.js
+│   │   ├── utils/
+│   │   │   ├── api.js
+│   │   │   └── helpers.js
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── index.html
+│   └── package.json
+├── server/
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── users.js
+│   │   ├── faculties.js
+│   │   ├── departments.js
+│   │   ├── groups.js
+│   │   ├── subjects.js
+│   │   ├── lectures.js
+│   │   ├── exams.js
+│   │   └── results.js
+│   ├── middleware/
+│   │   ├── auth.js
+│   │   └── roles.js
+│   ├── services/
+│   │   ├── gemini.js
+│   │   └── fileProcessor.js
+│   ├── db/
+│   │   └── index.js
+│   └── index.js
+├── uploads/
+├── .env
+└── package.json
+
+===== IMPORTANT IMPLEMENTATION NOTES =====
+
+1. Use bcrypt for password hashing
+2. Use express-session with PostgreSQL store for sessions
+3. Use multer for file uploads
+4. Use pdf-parse for PDF text extraction
+5. Use mammoth for DOCX text extraction
+6. Implement proper error handling with try-catch
+7. Add loading states for all async operations
+8. All text must be in UZBEK language
+9. Mobile responsive design required
+10. Teachers NEVER see actual questions - only count
+11. Each student gets unique questions - no repeats if possible
+12. Auto-save student answers every 30 seconds
+13. Auto-submit when time expires
+14. Tab switch detection with 3 warnings before disqualification
+
+Build this as a production-ready, fully functional examination system.
+```
