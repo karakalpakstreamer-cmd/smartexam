@@ -105,10 +105,7 @@ export default function SessionDetailsPage() {
 
   const updateScoreMutation = useMutation({
     mutationFn: async ({ answerId, score, comment }: { answerId: number; score: number; comment: string }) => {
-      return apiRequest(`/api/teacher/answers/${answerId}/score`, {
-        method: "PATCH",
-        body: JSON.stringify({ score, comment }),
-      });
+      return apiRequest("PATCH", `/api/teacher/answers/${answerId}/score`, { score, comment });
     },
     onSuccess: () => {
       toast({ title: "Muvaffaqiyatli!", description: "Ball yangilandi" });

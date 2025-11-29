@@ -53,9 +53,7 @@ export default function ExamsPage() {
 
   const startExamMutation = useMutation({
     mutationFn: async (examId: number) => {
-      return apiRequest(`/api/exams/${examId}/start`, {
-        method: "POST",
-      });
+      return apiRequest("POST", `/api/exams/${examId}/start`);
     },
     onSuccess: () => {
       toast({ title: "Muvaffaqiyatli!", description: "Imtihon boshlandi" });
@@ -68,9 +66,7 @@ export default function ExamsPage() {
 
   const deleteExamMutation = useMutation({
     mutationFn: async (examId: number) => {
-      return apiRequest(`/api/exams/${examId}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/exams/${examId}`);
     },
     onSuccess: () => {
       toast({ title: "Muvaffaqiyatli!", description: "Imtihon o'chirildi" });
