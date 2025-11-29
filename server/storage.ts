@@ -78,7 +78,7 @@ export interface IStorage {
   deleteTeacher(id: number): Promise<void>;
   resetTeacherPassword(id: number): Promise<string>;
   
-  createStudent(data: InsertUser): Promise<{ user: User; password: string }>;
+  createStudent(data: InsertUser, customPassword?: string): Promise<{ user: User; password: string }>;
   getStudents(): Promise<(User & { facultyName: string; departmentName: string; groupName: string; courseYear: number })[]>;
   updateStudent(id: number, data: Partial<InsertUser>): Promise<User>;
   deleteStudent(id: number): Promise<void>;
@@ -100,9 +100,27 @@ export interface IStorage {
   getStudentInfo(studentId: number): Promise<{ groupName: string; courseYear: number; facultyName: string; departmentName: string }>;
   getStudentUpcomingExams(studentId: number): Promise<any[]>;
   getStudentExams(studentId: number): Promise<any[]>;
+  getStudentExamResult(studentId: number, examId: number): Promise<any>;
   
   getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }>;
   getTeacherTodayExams(teacherId: number): Promise<any[]>;
+  getTeacherQuestions(teacherId: number, subjectId: number): Promise<any[]>;
+  getTeacherExams(teacherId: number): Promise<any[]>;
+  createExamWithTickets(data: any): Promise<{ examId: number; ticketCount: number }>;
+  startExam(examId: number, teacherId: number): Promise<void>;
+  deleteExam(examId: number, teacherId: number): Promise<void>;
+  getStudentExamDetails(studentId: number, examId: number): Promise<any>;
+  startStudentExamSession(studentId: number, examId: number): Promise<any>;
+  getStudentExamSession(studentId: number, examId: number): Promise<any>;
+  saveStudentAnswer(sessionId: number, questionId: number, answerText: string): Promise<void>;
+  recordViolation(sessionId: number, type: string): Promise<void>;
+  submitExamSession(sessionId: number): Promise<void>;
+  getSessionAnswersForGrading(sessionId: number): Promise<any[]>;
+  updateAnswerGrade(answerId: number, score: string, feedback: object): Promise<void>;
+  getTeacherExamResults(teacherId: number, examIdFilter?: number): Promise<any[]>;
+  getSessionDetails(sessionId: number, teacherId: number): Promise<any | null>;
+  updateAnswerManualScore(answerId: number, score: number, comment: string): Promise<void>;
+  getExamExportData(examId: number, teacherId: number): Promise<any>;
 }
 
 function generatePassword(userId: string): string {
@@ -635,6 +653,34 @@ export const storage: IStorage = {
     return result;
   },
 
+  async getStudentExamResult(studentId: number, examId: number): Promise<any> {
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
+    if (!exam) throw new Error("Imtihon topilmadi");
+    
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
+    
+    const [session] = await db.select().from(examSessions)
+      .where(and(eq(examSessions.examId, examId), eq(examSessions.studentId, studentId)))
+      .limit(1);
+    
+    let answeredCount = 0;
+    let totalQuestions = exam.questionsPerTicket || 5;
+    
+    if (session) {
+      const answers = await db.select().from(studentAnswers).where(eq(studentAnswers.sessionId, session.id));
+      answeredCount = answers.filter(a => a.answerText && a.answerText.trim().length > 0).length;
+    }
+    
+    return {
+      examName: exam.name,
+      subjectName: subject?.name || "",
+      submittedAt: session?.submittedAt,
+      answeredCount,
+      totalQuestions,
+      status: session?.status || "unknown",
+    };
+  },
+
   async getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }> {
     const subjectsAssigned = await db.select({ count: count() }).from(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
     const lecturesUploaded = await db.select({ count: count() }).from(lectures).where(eq(lectures.teacherId, teacherId));
@@ -779,9 +825,9 @@ export const storage: IStorage = {
       
       await db.insert(examTickets).values({
         examId: exam.id,
-        studentId: student.id,
+        assignedTo: student.id,
         questionIds: ticketQuestions,
-        ticketNumber: student.id.toString(),
+        ticketNumber: studentsInGroups.indexOf(student) + 1,
       });
     }
     
@@ -909,6 +955,11 @@ export const storage: IStorage = {
       savedAnswersMap[a.questionId!] = a.answerText || "";
     });
     
+    const durationMs = (exam?.durationMinutes || 60) * 60 * 1000;
+    const endTime = session.startedAt 
+      ? new Date(new Date(session.startedAt).getTime() + durationMs).toISOString()
+      : null;
+    
     return {
       sessionId: session.id,
       examId: exam?.id,
@@ -917,7 +968,7 @@ export const storage: IStorage = {
       teacherName: teacher?.fullName || "",
       durationMinutes: exam?.durationMinutes || 60,
       startedAt: session.startedAt,
-      endTime: session.endTime,
+      endTime,
       questions: ticketQuestions.map((q, index) => ({
         id: q.id,
         questionText: q.questionText,
@@ -980,7 +1031,7 @@ export const storage: IStorage = {
       .select({
         answerId: studentAnswers.id,
         questionId: studentAnswers.questionId,
-        questionText: questions.text,
+        questionText: questions.questionText,
         sampleAnswer: questions.sampleAnswer,
         keywords: questions.keywords,
         answerText: studentAnswers.answerText,
@@ -990,8 +1041,12 @@ export const storage: IStorage = {
       .where(eq(studentAnswers.sessionId, sessionId));
     
     return results.map(r => ({
-      ...r,
+      answerId: r.answerId,
+      questionId: r.questionId || 0,
+      questionText: r.questionText || "",
+      sampleAnswer: r.sampleAnswer,
       keywords: Array.isArray(r.keywords) ? r.keywords : [],
+      answerText: r.answerText,
     }));
   },
 
@@ -1004,8 +1059,8 @@ export const storage: IStorage = {
       .where(eq(studentAnswers.id, answerId));
   },
 
-  async getTeacherExamResults(teacherId: string, examIdFilter?: number): Promise<any[]> {
-    let query = db
+  async getTeacherExamResults(teacherId: number, examIdFilter?: number): Promise<any[]> {
+    const baseQuery = db
       .select({
         sessionId: examSessions.id,
         studentId: examSessions.studentId,
@@ -1016,23 +1071,27 @@ export const storage: IStorage = {
         startedAt: examSessions.startedAt,
         submittedAt: examSessions.submittedAt,
         violationsCount: examSessions.violationsCount,
-        ticketNumber: tickets.ticketNumber,
+        ticketNumber: examTickets.ticketNumber,
         subjectName: subjects.name,
-        groupName: groups.name,
+        groupName: studentGroups.name,
       })
       .from(examSessions)
       .innerJoin(exams, eq(examSessions.examId, exams.id))
       .innerJoin(users, eq(examSessions.studentId, users.id))
-      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .innerJoin(examTickets, eq(examSessions.ticketId, examTickets.id))
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
-      .innerJoin(groups, eq(exams.groupId, groups.id))
-      .where(eq(exams.teacherId, teacherId));
+      .leftJoin(studentGroups, eq(users.groupId, studentGroups.id));
     
+    let sessions;
     if (examIdFilter) {
-      query = query.where(and(eq(exams.teacherId, teacherId), eq(exams.id, examIdFilter)));
+      sessions = await baseQuery
+        .where(and(eq(exams.teacherId, teacherId), eq(exams.id, examIdFilter)))
+        .orderBy(desc(examSessions.submittedAt));
+    } else {
+      sessions = await baseQuery
+        .where(eq(exams.teacherId, teacherId))
+        .orderBy(desc(examSessions.submittedAt));
     }
-    
-    const sessions = await query.orderBy(desc(examSessions.submittedAt));
     
     const results = await Promise.all(sessions.map(async (session) => {
       const answers = await db
@@ -1056,7 +1115,7 @@ export const storage: IStorage = {
     return results;
   },
 
-  async getSessionDetails(sessionId: number, teacherId: string): Promise<any | null> {
+  async getSessionDetails(sessionId: number, teacherId: number): Promise<any | null> {
     const [session] = await db
       .select({
         sessionId: examSessions.id,
@@ -1069,16 +1128,16 @@ export const storage: IStorage = {
         submittedAt: examSessions.submittedAt,
         violationsCount: examSessions.violationsCount,
         violationDetails: examSessions.violationDetails,
-        ticketNumber: tickets.ticketNumber,
+        ticketNumber: examTickets.ticketNumber,
         subjectName: subjects.name,
-        groupName: groups.name,
+        groupName: studentGroups.name,
       })
       .from(examSessions)
       .innerJoin(exams, eq(examSessions.examId, exams.id))
       .innerJoin(users, eq(examSessions.studentId, users.id))
-      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .innerJoin(examTickets, eq(examSessions.ticketId, examTickets.id))
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
-      .innerJoin(groups, eq(exams.groupId, groups.id))
+      .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
       .where(and(eq(examSessions.id, sessionId), eq(exams.teacherId, teacherId)))
       .limit(1);
     
@@ -1088,7 +1147,7 @@ export const storage: IStorage = {
       .select({
         id: studentAnswers.id,
         questionId: studentAnswers.questionId,
-        questionText: questions.text,
+        questionText: questions.questionText,
         sampleAnswer: questions.sampleAnswer,
         keywords: questions.keywords,
         answerText: studentAnswers.answerText,
@@ -1117,18 +1176,17 @@ export const storage: IStorage = {
       .where(eq(studentAnswers.id, answerId));
   },
 
-  async getExamExportData(examId: number, teacherId: string): Promise<any> {
+  async getExamExportData(examId: number, teacherId: number): Promise<any> {
     const [exam] = await db
       .select({
         id: exams.id,
         name: exams.name,
         subjectName: subjects.name,
-        groupName: groups.name,
         examDate: exams.examDate,
+        targetGroups: exams.targetGroups,
       })
       .from(exams)
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
-      .innerJoin(groups, eq(exams.groupId, groups.id))
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
     
@@ -1142,11 +1200,13 @@ export const storage: IStorage = {
         status: examSessions.status,
         submittedAt: examSessions.submittedAt,
         violationsCount: examSessions.violationsCount,
-        ticketNumber: tickets.ticketNumber,
+        ticketNumber: examTickets.ticketNumber,
+        groupName: studentGroups.name,
       })
       .from(examSessions)
       .innerJoin(users, eq(examSessions.studentId, users.id))
-      .innerJoin(tickets, eq(examSessions.ticketId, tickets.id))
+      .innerJoin(examTickets, eq(examSessions.ticketId, examTickets.id))
+      .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
       .where(eq(examSessions.examId, examId));
     
     const results = await Promise.all(sessions.map(async (session) => {

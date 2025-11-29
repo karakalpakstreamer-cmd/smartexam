@@ -102,20 +102,12 @@ JAVOBNI FAQAT JSON FORMATDA BER (boshqa hech narsa yozma):
     });
 
     let text = "";
-    try {
-      if (response.response?.text) {
-        const textResult = response.response.text();
-        text = typeof textResult === "string" ? textResult : await textResult;
-      } else if (response.candidates?.[0]?.content?.parts) {
-        text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
-      } else if (typeof response.text === "function") {
-        const textResult = response.text();
-        text = typeof textResult === "string" ? textResult : await textResult;
-      } else if (typeof response.text === "string") {
-        text = response.text;
-      }
-    } catch (textError) {
-      console.error("Error extracting text from response:", textError);
+    if (typeof response.text === "function") {
+      text = await response.text();
+    } else if (typeof response.text === "string") {
+      text = response.text;
+    } else if (response.candidates?.[0]?.content?.parts) {
+      text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
     }
     console.log("AI question generation response:", text.substring(0, 200));
     const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -198,20 +190,12 @@ JAVOBNI FAQAT JSON FORMATDA BER:
     });
 
     let text = "";
-    try {
-      if (response.response?.text) {
-        const textResult = response.response.text();
-        text = typeof textResult === "string" ? textResult : await textResult;
-      } else if (response.candidates?.[0]?.content?.parts) {
-        text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
-      } else if (typeof response.text === "function") {
-        const textResult = response.text();
-        text = typeof textResult === "string" ? textResult : await textResult;
-      } else if (typeof response.text === "string") {
-        text = response.text;
-      }
-    } catch (textError) {
-      console.error("Error extracting text from response:", textError);
+    if (typeof response.text === "function") {
+      text = await response.text();
+    } else if (typeof response.text === "string") {
+      text = response.text;
+    } else if (response.candidates?.[0]?.content?.parts) {
+      text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
     }
     console.log("AI grading response:", text.substring(0, 200));
     
@@ -994,6 +978,17 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Imtihonni topshirishda xatolik" });
+    }
+  });
+
+  app.get("/api/student/exam-result/:examId", requireAuth, requireRole("talaba"), async (req, res) => {
+    try {
+      const { examId } = req.params;
+      const result = await storage.getStudentExamResult(req.session.userId!, parseInt(examId));
+      res.json(result);
+    } catch (error) {
+      console.error("Get exam result error:", error);
+      res.status(500).json({ error: "Natijalarni olishda xatolik" });
     }
   });
 

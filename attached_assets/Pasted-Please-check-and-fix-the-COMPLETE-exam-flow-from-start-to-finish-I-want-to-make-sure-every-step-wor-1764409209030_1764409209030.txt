@@ -1,0 +1,138 @@
+Please check and fix the COMPLETE exam flow from start to finish. I want to make sure every step works without errors.
+
+## CURRENT STATUS:
+- Ticket generation is broken (students get "Sizga bilet ajratilmagan" error)
+- We don't know if the exam interface, answer submission, AI grading, and results pages work
+
+## PLEASE CHECK AND FIX ALL THESE STEPS:
+
+### STEP 1: FIX EXAM CREATION & TICKET GENERATION
+
+When teacher creates an exam:
+- Get all students from selected groups
+- Get all questions for the subject
+- Create unique tickets with 5 random questions for each student
+- Save tickets to exam_tickets table with assigned_to = student_id
+- Create exam_sessions for each student with status = 'not_started'
+- Show success message with number of tickets created
+
+### STEP 2: VERIFY STUDENT EXAM LIST PAGE
+
+Route: /talaba/imtihonlar
+- Should show list of upcoming exams assigned to this student
+- Each exam card shows: subject, date, time, duration
+- "Imtihonni boshlash" button when exam is active
+
+### STEP 3: VERIFY PRE-EXAM CONFIRMATION PAGE
+
+Route: /talaba/imtihon/:id/boshlash
+- Show exam rules
+- Checkbox for accepting rules
+- "Imtihonni boshlash" button appears when time is right and checkbox is checked
+- Clicking button should start the exam session
+
+### STEP 4: CREATE/FIX ACTIVE EXAM INTERFACE
+
+Route: /talaba/imtihon/:id
+This is the main exam taking screen. Make sure it has:
+
+Layout:
+- Top bar: Subject name (left), Countdown timer (center), "Tugatish" button (right)
+- Main area: Question text and answer textarea
+- Bottom: Question navigation dots (1, 2, 3, 4, 5)
+
+Features needed:
+- Show current question text with points
+- Large textarea for student to write answer
+- Character count display
+- Auto-save every 30 seconds with "Saqlandi" indicator
+- Previous/Next buttons to navigate between questions
+- Question dots showing status (empty, in-progress, answered)
+- Countdown timer that actually counts down
+- Timer turns red when less than 5 minutes remain
+- Warning toast at 2 minutes remaining
+
+Security features:
+- Copy-paste should be disabled in the textarea
+- Tab switch detection - show warning modal when student leaves the page
+- Count tab switches and show warning "Bu sizning X/3 ogohlantirishingiz"
+- After 3 tab switches, auto-submit and disqualify student
+- Fullscreen mode encouraged
+
+### STEP 5: FIX ANSWER SAVING
+
+When student types an answer:
+- Save to student_answers table
+- Link to session_id and question_id
+- Auto-save every 30 seconds
+- Also save when navigating between questions
+- Also save when clicking "Tugatish"
+
+### STEP 6: FIX EXAM SUBMISSION
+
+When student clicks "Tugatish" or time expires:
+- Show confirmation modal: "Imtihonni tugatmoqchimisiz? X/5 savol javoblangan"
+- On confirm: Save all answers, update session status to 'submitted', record submitted_at time
+- Auto-submit when timer reaches 0 (no confirmation needed)
+- After submission, redirect to success page
+
+### STEP 7: CREATE SUCCESS PAGE
+
+Route: /talaba/imtihon/:id/yakunlandi
+- Show success message: "Imtihon muvaffaqiyatli topshirildi!"
+- Show submission time
+- Show number of questions answered
+- "Bosh sahifaga" button
+
+### STEP 8: FIX AI GRADING
+
+After student submits, the system should automatically grade answers:
+
+For each answer:
+- Send to Gemini API with the question, sample answer, and student's answer
+- Ask AI to grade on 5 criteria (relevance, completeness, clarity, keywords, logic)
+- Get score (0 to max_points) and feedback
+- Save ai_score and ai_feedback to student_answers table
+- Calculate total_ai_score and save to exam_sessions table
+
+Gemini API call should include:
+- Question text
+- Keywords for the question
+- Sample answer (ideal answer)
+- Student's answer
+- Maximum points
+
+### STEP 9: FIX TEACHER RESULTS PAGE
+
+Route: /oqituvchi/natijalar
+- Dropdown to select completed exam
+- Table showing all students who took the exam
+- Columns: Student name, Group, Submit time, AI Score, Final Score, Status, Actions
+- Click on student to see detailed grading view
+
+### STEP 10: FIX GRADING VIEW
+
+Route: /oqituvchi/natijalar/:sessionId
+- Show student info
+- For each question show:
+  - Question text
+  - Student's answer
+  - AI analysis with 5 criteria breakdown
+  - AI suggested score
+  - Input field for teacher to enter final score
+  - Comment field for teacher feedback
+- Save button to save teacher's scores
+- "Next student" button
+
+## SUMMARY:
+
+Please go through each step above and make sure:
+1. The page/route exists (no 404)
+2. The functionality works correctly
+3. Data is saved to the correct database tables
+4. Error handling is in place
+5. User sees appropriate success/error messages
+
+This is the core functionality of SmartExam. Every step must work for the platform to be useful.
+
+After fixing, please confirm which steps are now working.

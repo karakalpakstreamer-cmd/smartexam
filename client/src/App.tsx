@@ -31,6 +31,7 @@ import StudentDashboard from "@/pages/student/dashboard";
 import StudentExamsPage from "@/pages/student/exams";
 import ExamStartPage from "@/pages/student/exam-start";
 import ExamSessionPage from "@/pages/student/exam-session";
+import ExamSuccessPage from "@/pages/student/exam-success";
 
 function LoadingScreen() {
   return (
@@ -222,6 +223,12 @@ function Router() {
       <Route path="/talaba/imtihon/:examId/session">
         <ProtectedRoute allowedRoles={["talaba"]}>
           <ExamSessionPage />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/talaba/imtihon/:examId/yakunlandi">
+        <ProtectedRoute allowedRoles={["talaba"]}>
+          <ExamSuccessPage />
         </ProtectedRoute>
       </Route>
 

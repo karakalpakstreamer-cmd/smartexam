@@ -83,7 +83,7 @@ export default function ExamSessionPage() {
         title: "Muvaffaqiyatli!",
         description: "Imtihon topshirildi",
       });
-      setLocation("/talaba/imtihonlar");
+      setLocation(`/talaba/imtihon/${examId}/yakunlandi`);
     },
     onError: () => {
       toast({
