@@ -1,0 +1,107 @@
+Please fix the following critical issues in SmartExam. The main goal is to complete ONE FULL PROCESS from teacher creating exam to student taking exam.
+
+## ISSUE 1: TEACHER PANEL - EXAM CREATION ERROR AT FINAL STEP
+
+The teacher panel is mostly working, but there is an error at the final step when creating an exam.
+
+Please check and fix:
+- The "Imtihonni yaratish" (Create Exam) button at the final step (Step 3 - Ko'rib chiqish)
+- Check if the exam data is being saved correctly to the database
+- Check if the exam tickets are being generated properly
+- Check if students are being assigned to the exam correctly
+- Make sure all required fields are validated before submission
+- Show proper success message after exam is created
+- Redirect teacher to exam list after successful creation
+
+The exam creation flow should work like this:
+Step 1: Teacher enters basic info (name, subject, type, groups, date, time, duration)
+Step 2: Teacher configures questions (5 questions per ticket, points per question)
+Step 3: Teacher reviews all settings and clicks "Imtihonni yaratish"
+Result: Exam is created, unique tickets are generated for each student, exam appears in the list
+
+Please check the console for any error messages and fix them.
+
+## ISSUE 2: STUDENT PANEL - EXAMS PAGE RETURNS 404 ERROR
+
+The student exams page (/talaba/imtihonlar) returns a 404 error. This page was not created.
+
+Please create the complete student exams page with these features:
+
+### Exams List Page (/talaba/imtihonlar):
+- Show two tabs: "Yaqinlashayotgan" (Upcoming) and "O'tkazilgan" (Completed)
+- For each upcoming exam, show a card with:
+  - Subject name (large text)
+  - Exam type badge (Oraliq/Joriy/Yakuniy)
+  - Teacher name
+  - Date and time
+  - Duration (e.g., "60 daqiqa")
+  - Number of questions (e.g., "5 ta savol")
+  - Countdown if exam is within 24 hours
+  - "Batafsil" (Details) expandable section showing exam rules
+  - "Imtihonni boshlash" (Start Exam) button
+- The "Start Exam" button should be disabled if current time is before exam start time
+- The "Start Exam" button should be enabled when exam is active
+
+### Pre-Exam Confirmation Page (/talaba/imtihon/:id/boshlash):
+- Show student identity confirmation
+- Display student name, ID, group, faculty
+- Show exam rules list:
+  - Exam duration
+  - Tab switching is prohibited
+  - Copy-paste is blocked
+  - 3 warnings = disqualification
+- Checkbox: "Men [Student Name]man va imtihon qoidalariga roziman"
+- "Tasdiqlash va boshlash" button (disabled until checkbox is checked)
+
+### Active Exam Page (/talaba/imtihon/:id):
+- Fullscreen exam interface
+- Top bar with: Subject name, Countdown timer, "Tugatish" button
+- Question display area showing current question text and points
+- Answer textarea for student to write their answer
+- Auto-save indicator showing "Saqlandi" with timestamp
+- Character count for the answer
+- Bottom navigation with question dots (showing answered/unanswered status)
+- Previous and Next buttons to navigate between questions
+- Tab switch detection with warning modal
+- Auto-submit when time expires
+
+### Exam Completion Page:
+- Success message: "Imtihon muvaffaqiyatli topshirildi!"
+- Show submission timestamp
+- Show number of questions answered
+- "Bosh sahifaga" button to return to dashboard
+
+## ISSUE 3: COMPLETE THE FULL EXAM FLOW
+
+After fixing issues 1 and 2, please verify the complete flow works:
+
+1. Teacher logs in
+2. Teacher uploads a lecture (PDF/Word)
+3. AI generates questions from the lecture (teacher cannot see questions)
+4. Teacher creates an exam, selects groups, sets date/time
+5. System generates unique tickets with 5 questions for each student
+6. Exam status changes to "scheduled"
+7. When exam time arrives, status changes to "active"
+8. Student logs in
+9. Student sees the exam in "Yaqinlashayotgan" list
+10. Student clicks "Imtihonni boshlash" when exam is active
+11. Student confirms identity and accepts rules
+12. Student enters fullscreen exam mode
+13. Student answers all 5 questions
+14. Student submits or time expires (auto-submit)
+15. AI grades all answers using 5 criteria
+16. Teacher sees results with AI scores
+17. Teacher can adjust scores and confirm
+
+Please make sure this entire flow works without errors.
+
+## SUMMARY:
+
+1. Fix the exam creation error in teacher panel (final step not working)
+2. Create the missing student exams page (currently 404)
+3. Create the pre-exam confirmation page
+4. Create the active exam interface with all security features
+5. Create the exam completion page
+6. Verify the complete flow from exam creation to AI grading
+
+This is the most critical feature of SmartExam. Please prioritize completing this full process.
