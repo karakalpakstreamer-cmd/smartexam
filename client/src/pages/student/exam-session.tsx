@@ -61,6 +61,7 @@ export default function ExamSessionPage() {
   
   const violationsRef = useRef<AntiCheatViolation[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isSubmittingRef = useRef(false);
 
   const { data: session, isLoading, error } = useQuery<ExamSession>({
     queryKey: ["/api/student/exam-session", examId],
@@ -138,7 +139,8 @@ export default function ExamSessionPage() {
       const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
       setTimeLeft(remaining);
       
-      if (remaining <= 0) {
+      if (remaining <= 0 && !isSubmittingRef.current) {
+        isSubmittingRef.current = true;
         submitExamMutation.mutate();
       }
     };
@@ -153,7 +155,7 @@ export default function ExamSessionPage() {
     if (!session || !isFullscreen) return;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden && !isSubmittingRef.current && !showSubmitDialog) {
         addViolation("tab_switch");
       }
     };
@@ -201,7 +203,7 @@ export default function ExamSessionPage() {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [session, isFullscreen, addViolation]);
+  }, [session, isFullscreen, addViolation, showSubmitDialog]);
 
   const enterFullscreen = async () => {
     try {
@@ -245,6 +247,7 @@ export default function ExamSessionPage() {
   };
 
   const confirmSubmit = () => {
+    isSubmittingRef.current = true;
     setShowSubmitDialog(false);
     submitExamMutation.mutate();
   };

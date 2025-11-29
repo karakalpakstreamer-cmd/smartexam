@@ -102,12 +102,13 @@ JAVOBNI FAQAT JSON FORMATDA BER (boshqa hech narsa yozma):
     });
 
     let text = "";
-    if (typeof response.text === "function") {
-      text = await response.text();
-    } else if (typeof response.text === "string") {
-      text = response.text;
-    } else if (response.candidates?.[0]?.content?.parts) {
-      text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
+    const respAny = response as any;
+    if (typeof respAny.text === "function") {
+      text = await respAny.text();
+    } else if (typeof respAny.text === "string") {
+      text = respAny.text;
+    } else if (respAny.candidates?.[0]?.content?.parts) {
+      text = respAny.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
     }
     console.log("AI question generation response:", text.substring(0, 200));
     const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -190,12 +191,13 @@ JAVOBNI FAQAT JSON FORMATDA BER:
     });
 
     let text = "";
-    if (typeof response.text === "function") {
-      text = await response.text();
-    } else if (typeof response.text === "string") {
-      text = response.text;
-    } else if (response.candidates?.[0]?.content?.parts) {
-      text = response.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
+    const respAny = response as any;
+    if (typeof respAny.text === "function") {
+      text = await respAny.text();
+    } else if (typeof respAny.text === "string") {
+      text = respAny.text;
+    } else if (respAny.candidates?.[0]?.content?.parts) {
+      text = respAny.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
     }
     console.log("AI grading response:", text.substring(0, 200));
     
@@ -891,6 +893,38 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/teacher/exam/:id/monitoring", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = await storage.getExamMonitoringData(parseInt(id), req.session.userId!);
+      res.json(data);
+    } catch (error) {
+      console.error("Monitoring error:", error);
+      res.status(500).json({ error: "Monitoring ma'lumotlarini olishda xatolik" });
+    }
+  });
+
+  app.post("/api/teacher/exam/:id/end", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.endExam(parseInt(id), req.session.userId!);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Imtihonni tugatishda xatolik" });
+    }
+  });
+
+  app.post("/api/teacher/exam/:id/add-time", requireAuth, requireRole("oqituvchi"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { minutes } = req.body;
+      await storage.addExamTime(parseInt(id), req.session.userId!, minutes || 10);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Vaqt qo'shishda xatolik" });
+    }
+  });
+
   app.get("/api/student/exam/:examId", requireAuth, requireRole("talaba"), async (req, res) => {
     try {
       const { examId } = req.params;
@@ -952,30 +986,40 @@ export async function registerRoutes(
   app.post("/api/student/exam-session/:sessionId/submit", requireAuth, requireRole("talaba"), async (req, res) => {
     try {
       const { sessionId } = req.params;
-      await storage.submitExamSession(parseInt(sessionId));
+      const parsedSessionId = parseInt(sessionId);
       
-      const answers = await storage.getSessionAnswersForGrading(parseInt(sessionId));
-      
-      for (const answer of answers) {
-        try {
-          const gradingResult = await gradeAnswerWithAI(
-            answer.questionText,
-            answer.sampleAnswer || "",
-            answer.keywords || [],
-            answer.answerText || ""
-          );
-          
-          await storage.updateAnswerGrade(
-            answer.answerId,
-            gradingResult.score.toString(),
-            gradingResult
-          );
-        } catch (gradingError) {
-          console.error("Grading error for answer:", answer.answerId, gradingError);
-        }
-      }
+      await storage.submitExamSession(parsedSessionId);
       
       res.json({ success: true });
+      
+      (async () => {
+        try {
+          const answers = await storage.getSessionAnswersForGrading(parsedSessionId);
+          
+          for (const answer of answers) {
+            try {
+              const gradingResult = await gradeAnswerWithAI(
+                answer.questionText,
+                answer.sampleAnswer || "",
+                answer.keywords || [],
+                answer.answerText || ""
+              );
+              
+              await storage.updateAnswerGrade(
+                answer.answerId,
+                gradingResult.score.toString(),
+                gradingResult
+              );
+            } catch (gradingError) {
+              console.error("Grading error for answer:", answer.answerId, gradingError);
+            }
+          }
+          console.log(`Background grading completed for session ${parsedSessionId}`);
+        } catch (bgError) {
+          console.error("Background grading error:", bgError);
+        }
+      })();
+      
     } catch (error) {
       res.status(500).json({ error: "Imtihonni topshirishda xatolik" });
     }

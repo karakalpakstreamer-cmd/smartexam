@@ -139,3 +139,24 @@ Required environment variables:
 - Lucide React for icon library
 - date-fns for date formatting and manipulation
 - class-variance-authority and clsx for conditional styling
+
+## Recent Changes (November 2025)
+
+### Teacher Exam Monitoring
+- Added real-time monitoring page at `/oqituvchi/imtihonlar/:id/monitoring`
+- Statistics bar showing: total students, started, submitted, problematic
+- Live countdown timer displaying remaining exam time
+- Student status cards with color-coded badges (waiting/in_progress/submitted/disqualified)
+- Activity feed with timestamped events
+- Auto-refresh every 5 seconds using React Query's refetchInterval
+- End exam and add time functionality
+
+### Performance Optimizations
+- **Background AI Grading:** Exam submission now returns immediately while AI grading runs asynchronously in the background
+- **Batch Database Queries:** Monitoring page uses batch loading for student answers and tickets to avoid N+1 queries
+- **Merged Student Sources:** Students are collected from both targetGroups assignments and active exam sessions
+
+### Anti-Cheat Improvements
+- **Tab-Switch Protection:** Added `isSubmittingRef` flag to prevent false tab-switch violations during legitimate submission
+- Detection disabled when submit dialog is open or during auto-submit on timeout
+- Warning count tracked per session with disqualification at 3+ violations

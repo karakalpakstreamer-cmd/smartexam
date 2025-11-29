@@ -24,6 +24,7 @@ import TeacherDashboard from "@/pages/teacher/dashboard";
 import LecturesPage from "@/pages/teacher/lectures";
 import ExamsPage from "@/pages/teacher/exams";
 import CreateExamPage from "@/pages/teacher/create-exam";
+import ExamMonitoringPage from "@/pages/teacher/exam-monitoring";
 import ResultsPage from "@/pages/teacher/results";
 import SessionDetailsPage from "@/pages/teacher/session-details";
 
@@ -187,6 +188,12 @@ function Router() {
       <Route path="/oqituvchi/imtihonlar/yaratish">
         <ProtectedRoute allowedRoles={["oqituvchi"]}>
           <CreateExamPage />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/oqituvchi/imtihonlar/:id/monitoring">
+        <ProtectedRoute allowedRoles={["oqituvchi"]}>
+          <ExamMonitoringPage />
         </ProtectedRoute>
       </Route>
 

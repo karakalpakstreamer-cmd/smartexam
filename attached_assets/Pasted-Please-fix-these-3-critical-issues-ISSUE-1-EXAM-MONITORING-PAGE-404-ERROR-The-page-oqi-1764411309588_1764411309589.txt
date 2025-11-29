@@ -1,0 +1,148 @@
+Please fix these 3 critical issues:
+
+## ISSUE 1: EXAM MONITORING PAGE - 404 ERROR
+
+The page /oqituvchi/imtihonlar/:id/monitoring returns 404 error. This page was not created.
+
+Please create the Exam Monitoring page with these features:
+
+### Route: /oqituvchi/imtihonlar/:id/monitoring
+
+### Header Section:
+- Back button to return to exams list
+- Exam name and subject name
+- Large countdown timer showing remaining time
+- "Imtihonni tugatish" button (red, ends exam for all students)
+
+### Statistics Bar:
+- Jami talabalar: [total count]
+- Boshlagan: [started count]
+- Topshirgan: [submitted count]
+- Muammoli: [count with warnings] (red if > 0)
+
+### Main Content - Student Grid:
+Show a card for each student assigned to this exam:
+- Student avatar (initials)
+- Student name
+- Group name
+- Status badge:
+  - Gray: "Kutmoqda" (not started)
+  - Blue with pulse: "Yozmoqda" (in progress)
+  - Green: "Topshirdi" (submitted)
+  - Red: "Chetlashtirildi" (disqualified)
+- Progress indicator: "3/5 savol" (questions answered)
+- Time spent: "15:32"
+- Warning badge if tab_switches > 0 (show count like "⚠️ 2")
+
+### Alerts Panel (right side):
+Real-time activity feed showing:
+- "[Student name] imtihonni boshladi" - with timestamp
+- "[Student name] 3-savolni javobladi" - with timestamp
+- "[Student name] sahifadan chiqdi (1/3)" - yellow warning
+- "[Student name] sahifadan chiqdi (3/3) - CHETLASHTIRILDI" - red alert
+- "[Student name] imtihonni topshirdi" - green, with timestamp
+
+### Auto-refresh:
+- Page should refresh data every 5-10 seconds automatically
+- Show "Yangilandi: 14:35:22" timestamp
+
+### Actions:
+- Click on student card to see their current answers (read-only)
+- "Vaqt qo'shish" button to add extra time for all students
+- "Imtihonni tugatish" button to force-end the exam
+
+---
+
+## ISSUE 2: EXAM SUBMISSION IS SLOW AND FREEZING
+
+When student clicks "Tugatish" button, the page freezes and takes too long. Sometimes it shows late error messages.
+
+Please fix the submission process:
+
+### Problem: The submission is doing too much at once
+The system is probably trying to:
+1. Save all answers
+2. Call AI grading API for all 5 questions
+3. Wait for all AI responses
+4. Update database
+
+This is too slow and causes freezing.
+
+### Solution: Split into two parts
+
+PART A - Immediate submission (fast, under 2 seconds):
+1. Save all answers to student_answers table
+2. Update exam_session status to 'submitted'
+3. Set submitted_at timestamp
+4. Redirect to success page immediately
+5. Show "Imtihon topshirildi!" message
+
+PART B - Background AI grading (happens after redirect):
+1. AI grading should happen in the background
+2. Student does not wait for AI grading
+3. Use async processing or queue system
+4. Update ai_score when grading completes
+5. Teacher sees results when grading is done
+
+### Also fix:
+- Add loading spinner on "Tugatish" button when clicked
+- Disable button after click to prevent double-submission
+- Set timeout - if submission takes more than 10 seconds, show error
+- Add "Qayta urinish" button if submission fails
+
+---
+
+## ISSUE 3: FALSE WARNING WHEN CLICKING SUBMIT
+
+When student clicks "Tugatish" button, a tab-switch warning appears incorrectly. This should not happen.
+
+### The problem:
+The tab-switch detection is probably triggering when:
+- Opening the confirmation modal
+- The button click event
+- Some internal page state change
+
+### Solution:
+Add exceptions to the tab-switch detection:
+
+1. Do NOT count as tab-switch when:
+   - Confirmation modal is open
+   - Student is clicking "Tugatish" button
+   - Submission is in progress
+   - Page is redirecting to success page
+
+2. Add a flag like "isSubmitting" that disables tab-switch detection during submission
+
+3. Only detect REAL tab switches:
+   - document.hidden becomes true (browser tab changed)
+   - window loses focus to EXTERNAL application
+   - NOT internal modal/dialog interactions
+
+### Code logic should be:
+- When "Tugatish" clicked: set isSubmitting = true
+- While isSubmitting = true: ignore all tab-switch events
+- After redirect to success: tab-switch detection not needed
+
+---
+
+## SUMMARY OF FIXES:
+
+1. CREATE /oqituvchi/imtihonlar/:id/monitoring page with:
+   - Real-time student status grid
+   - Countdown timer
+   - Alerts feed
+   - Warning indicators
+   - Auto-refresh every 5-10 seconds
+
+2. FIX submission to be fast:
+   - Save answers immediately
+   - Redirect to success immediately
+   - AI grading happens in background
+   - Add loading state and prevent double-click
+
+3. FIX false warnings:
+   - Disable tab-switch detection during submission
+   - Only detect real tab switches
+   - Ignore internal modal interactions
+
+Please fix all three issues and confirm when done.

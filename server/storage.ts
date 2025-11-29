@@ -121,6 +121,9 @@ export interface IStorage {
   getSessionDetails(sessionId: number, teacherId: number): Promise<any | null>;
   updateAnswerManualScore(answerId: number, score: number, comment: string): Promise<void>;
   getExamExportData(examId: number, teacherId: number): Promise<any>;
+  getExamMonitoringData(examId: number, teacherId: number): Promise<any>;
+  endExam(examId: number, teacherId: number): Promise<void>;
+  addExamTime(examId: number, teacherId: number, minutes: number): Promise<void>;
 }
 
 function generatePassword(userId: string): string {
@@ -1236,5 +1239,232 @@ export const storage: IStorage = {
       exam,
       results,
     };
+  },
+
+  async getExamMonitoringData(examId: number, teacherId: number): Promise<any> {
+    const [exam] = await db
+      .select({
+        id: exams.id,
+        name: exams.name,
+        subjectName: subjects.name,
+        durationMinutes: exams.durationMinutes,
+        startTime: exams.startTime,
+        examDate: exams.examDate,
+        status: exams.status,
+        targetGroups: exams.targetGroups,
+      })
+      .from(exams)
+      .innerJoin(subjects, eq(exams.subjectId, subjects.id))
+      .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
+      .limit(1);
+    
+    if (!exam) throw new Error("Imtihon topilmadi");
+    
+    const groupIds = exam.targetGroups || [];
+    
+    let studentsFromGroups: { id: number; fullName: string; groupId: number | null; groupName: string | null }[] = [];
+    
+    if (groupIds.length > 0) {
+      studentsFromGroups = await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          groupId: users.groupId,
+          groupName: studentGroups.name,
+        })
+        .from(users)
+        .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
+        .where(and(eq(users.role, "talaba"), inArray(users.groupId, groupIds)));
+    }
+    
+    const studentsFromSessions = await db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        groupId: users.groupId,
+        groupName: studentGroups.name,
+      })
+      .from(examSessions)
+      .innerJoin(users, eq(examSessions.studentId, users.id))
+      .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
+      .where(eq(examSessions.examId, examId));
+    
+    const studentMap = new Map<number, { id: number; fullName: string; groupId: number | null; groupName: string | null }>();
+    for (const s of studentsFromGroups) {
+      studentMap.set(s.id, s);
+    }
+    for (const s of studentsFromSessions) {
+      if (!studentMap.has(s.id)) {
+        studentMap.set(s.id, s);
+      }
+    }
+    const allStudents = Array.from(studentMap.values());
+    
+    const sessions = await db
+      .select({
+        id: examSessions.id,
+        studentId: examSessions.studentId,
+        status: examSessions.status,
+        startedAt: examSessions.startedAt,
+        submittedAt: examSessions.submittedAt,
+        tabSwitches: examSessions.tabSwitches,
+        ticketId: examSessions.ticketId,
+      })
+      .from(examSessions)
+      .where(eq(examSessions.examId, examId));
+    
+    const sessionMap = new Map(sessions.map(s => [s.studentId, s]));
+    
+    const sessionIds = sessions.map(s => s.id);
+    const allAnswers = sessionIds.length > 0 
+      ? await db.select().from(studentAnswers).where(inArray(studentAnswers.sessionId, sessionIds))
+      : [];
+    const answersMap = new Map<number, typeof allAnswers>();
+    for (const answer of allAnswers) {
+      if (!answersMap.has(answer.sessionId)) {
+        answersMap.set(answer.sessionId, []);
+      }
+      answersMap.get(answer.sessionId)!.push(answer);
+    }
+    
+    const ticketIds = sessions.filter(s => s.ticketId).map(s => s.ticketId!);
+    const allTickets = ticketIds.length > 0
+      ? await db.select().from(examTickets).where(inArray(examTickets.id, ticketIds))
+      : [];
+    const ticketsMap = new Map(allTickets.map(t => [t.id, t]));
+    
+    const [examForQuestionCount] = await db.select({ questionsPerTicket: exams.questionsPerTicket })
+      .from(exams).where(eq(exams.id, examId)).limit(1);
+    const defaultQuestionCount = examForQuestionCount?.questionsPerTicket || 5;
+    
+    const students = allStudents.map((student) => {
+      const session = sessionMap.get(student.id);
+      let answeredCount = 0;
+      let totalQuestions = defaultQuestionCount;
+      let timeSpent = "00:00";
+      
+      if (session) {
+        if (session.ticketId) {
+          const ticket = ticketsMap.get(session.ticketId);
+          totalQuestions = ticket?.questionIds?.length || defaultQuestionCount;
+        }
+        
+        const sessionAnswers = answersMap.get(session.id) || [];
+        answeredCount = sessionAnswers.filter(a => a.answerText && a.answerText.trim().length > 0).length;
+        
+        if (session.startedAt) {
+          const startTime = new Date(session.startedAt).getTime();
+          const endTime = session.submittedAt ? new Date(session.submittedAt).getTime() : Date.now();
+          const elapsed = Math.floor((endTime - startTime) / 1000);
+          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed % 60;
+          timeSpent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+        }
+      }
+      
+      let status: "waiting" | "in_progress" | "submitted" | "disqualified" = "waiting";
+      if (session?.status === "submitted") status = "submitted";
+      else if (session?.status === "in_progress") status = "in_progress";
+      else if ((session?.tabSwitches || 0) >= 3) status = "disqualified";
+      
+      return {
+        id: student.id,
+        fullName: student.fullName,
+        groupName: student.groupName || "",
+        status,
+        answeredCount,
+        totalQuestions,
+        timeSpent,
+        tabSwitches: session?.tabSwitches || 0,
+        sessionId: session?.id,
+      };
+    });
+    
+    const started = students.filter(s => s.status !== "waiting").length;
+    const submitted = students.filter(s => s.status === "submitted").length;
+    const problematic = students.filter(s => s.tabSwitches > 0).length;
+    
+    const now = new Date();
+    const examStart = new Date(`${exam.examDate}T${exam.startTime}`);
+    const examEnd = new Date(examStart.getTime() + (exam.durationMinutes || 60) * 60 * 1000);
+    const remainingSeconds = Math.max(0, Math.floor((examEnd.getTime() - now.getTime()) / 1000));
+    
+    const activities = await db
+      .select({
+        id: activityLogs.id,
+        userId: activityLogs.userId,
+        action: activityLogs.action,
+        details: activityLogs.details,
+        createdAt: activityLogs.createdAt,
+      })
+      .from(activityLogs)
+      .where(sql`${activityLogs.details}->>'examId' = ${examId.toString()}`)
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(50);
+    
+    const activityList = await Promise.all(activities.map(async (a) => {
+      const [student] = await db.select().from(users).where(eq(users.id, a.userId || 0)).limit(1);
+      const details = a.details as any;
+      
+      let type: "start" | "answer" | "warning" | "disqualified" | "submit" = "start";
+      let actionText = a.action;
+      
+      if (a.action.includes("savol")) type = "answer";
+      else if (a.action.includes("sahifadan chiqdi") || a.action.includes("ogohlantirish")) {
+        type = details?.count >= 3 ? "disqualified" : "warning";
+      }
+      else if (a.action.includes("topshir")) type = "submit";
+      
+      return {
+        id: a.id,
+        studentName: student?.fullName || "Noma'lum",
+        action: actionText,
+        type,
+        timestamp: a.createdAt,
+      };
+    }));
+    
+    return {
+      exam: {
+        id: exam.id,
+        name: exam.name,
+        subjectName: exam.subjectName,
+        durationMinutes: exam.durationMinutes,
+        startTime: exam.startTime,
+        status: exam.status,
+      },
+      stats: {
+        total: students.length,
+        started,
+        submitted,
+        problematic,
+      },
+      students,
+      activities: activityList,
+      remainingSeconds,
+    };
+  },
+
+  async endExam(examId: number, teacherId: number): Promise<void> {
+    const [exam] = await db.select().from(exams)
+      .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
+      .limit(1);
+    if (!exam) throw new Error("Imtihon topilmadi");
+    
+    await db.update(exams).set({ status: "completed" }).where(eq(exams.id, examId));
+    
+    await db.update(examSessions)
+      .set({ status: "submitted", submittedAt: new Date() })
+      .where(and(eq(examSessions.examId, examId), eq(examSessions.status, "in_progress")));
+  },
+
+  async addExamTime(examId: number, teacherId: number, minutes: number): Promise<void> {
+    const [exam] = await db.select().from(exams)
+      .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
+      .limit(1);
+    if (!exam) throw new Error("Imtihon topilmadi");
+    
+    const newDuration = (exam.durationMinutes || 60) + minutes;
+    await db.update(exams).set({ durationMinutes: newDuration }).where(eq(exams.id, examId));
   },
 };
