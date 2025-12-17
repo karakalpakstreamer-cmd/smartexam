@@ -40,68 +40,68 @@ import {
   type InsertStudentAnswer,
   type ActivityLog,
   type InsertActivityLog,
-} from "@shared/schema";
+} from "../shared/schema";
 
 export interface IStorage {
   checkSetupNeeded(): Promise<boolean>;
   setupSystem(data: { fullName: string; email: string | null; phone: string | null; password: string }): Promise<User>;
-  
+
   getUserById(id: number): Promise<User | undefined>;
   getUserByUserId(userId: string): Promise<User | undefined>;
   validateUserLogin(userId: string, password: string, role: string): Promise<User | null>;
   getNextUserId(prefix: string): Promise<string>;
-  
+
   createFaculty(data: InsertFaculty): Promise<Faculty>;
   getFaculties(): Promise<(Faculty & { departmentsCount: number; teachersCount: number; studentsCount: number })[]>;
   updateFaculty(id: number, data: Partial<InsertFaculty>): Promise<Faculty>;
   deleteFaculty(id: number): Promise<void>;
-  
+
   createDepartment(data: InsertDepartment): Promise<Department>;
   getDepartments(): Promise<(Department & { facultyName: string; groupsCount: number })[]>;
   updateDepartment(id: number, data: Partial<InsertDepartment>): Promise<Department>;
   deleteDepartment(id: number): Promise<void>;
-  
+
   createGroup(data: InsertStudentGroup): Promise<StudentGroup>;
   getGroups(): Promise<(StudentGroup & { departmentName: string; facultyName: string; studentsCount: number })[]>;
   updateGroup(id: number, data: Partial<InsertStudentGroup>): Promise<StudentGroup>;
   deleteGroup(id: number): Promise<void>;
-  
+
   createSubject(data: InsertSubject): Promise<Subject>;
   getSubjects(): Promise<(Subject & { departmentName: string; facultyName: string; teachersCount: number })[]>;
   getSubjectsByDepartment(departmentId: number): Promise<Subject[]>;
   updateSubject(id: number, data: Partial<InsertSubject>): Promise<Subject>;
   deleteSubject(id: number): Promise<void>;
-  
+
   createTeacher(data: InsertUser & { subjectIds?: number[]; password?: string }): Promise<{ user: User; password: string }>;
   getTeachers(): Promise<(User & { facultyName: string; departmentName: string; subjects: { id: number; name: string }[] })[]>;
   updateTeacher(id: number, data: Partial<InsertUser> & { subjectIds?: number[] }): Promise<User>;
   deleteTeacher(id: number): Promise<void>;
   resetTeacherPassword(id: number): Promise<string>;
-  
+
   createStudent(data: InsertUser, customPassword?: string): Promise<{ user: User; password: string }>;
   getStudents(): Promise<(User & { facultyName: string; departmentName: string; groupName: string; courseYear: number })[]>;
   updateStudent(id: number, data: Partial<InsertUser>): Promise<User>;
   deleteStudent(id: number): Promise<void>;
   resetStudentPassword(id: number): Promise<string>;
-  
+
   getStats(): Promise<{ faculties: number; teachers: number; students: number; activeExams: number }>;
   getActivityLogs(limit?: number): Promise<ActivityLog[]>;
   createActivityLog(data: InsertActivityLog): Promise<ActivityLog>;
-  
+
   getTeacherSubjects(teacherId: number): Promise<Subject[]>;
   getTeacherLectures(teacherId: number): Promise<(Lecture & { subjectName: string })[]>;
   createLecture(data: InsertLecture): Promise<Lecture>;
   deleteLecture(id: number): Promise<void>;
   updateLectureQuestions(lectureId: number, count: number): Promise<void>;
-  
+
   createQuestions(questions: InsertQuestion[]): Promise<Question[]>;
   getUpcomingExams(): Promise<Exam[]>;
-  
+
   getStudentInfo(studentId: number): Promise<{ groupName: string; courseYear: number; facultyName: string; departmentName: string }>;
   getStudentUpcomingExams(studentId: number): Promise<any[]>;
   getStudentExams(studentId: number): Promise<any[]>;
   getStudentExamResult(studentId: number, examId: number): Promise<any>;
-  
+
   getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }>;
   getTeacherTodayExams(teacherId: number): Promise<any[]>;
   getTeacherQuestions(teacherId: number, subjectId: number): Promise<any[]>;
@@ -164,12 +164,12 @@ export const storage: IStorage = {
     const [user] = await db.select().from(users)
       .where(and(eq(users.userId, userId), eq(users.role, role), eq(users.isActive, true)))
       .limit(1);
-    
+
     if (!user) return null;
-    
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) return null;
-    
+
     await db.update(users).set({ lastLogin: new Date() }).where(eq(users.id, user.id));
     return user;
   },
@@ -178,11 +178,11 @@ export const storage: IStorage = {
     const [result] = await db.select({ maxId: sql<string>`MAX(${users.userId})` })
       .from(users)
       .where(sql`${users.userId} LIKE ${prefix + '%'}`);
-    
+
     if (!result.maxId) {
       return `${prefix}001`;
     }
-    
+
     const numPart = parseInt(result.maxId.replace(prefix, ""), 10);
     return `${prefix}${String(numPart + 1).padStart(3, "0")}`;
   },
@@ -194,12 +194,12 @@ export const storage: IStorage = {
 
   async getFaculties(): Promise<(Faculty & { departmentsCount: number; teachersCount: number; studentsCount: number })[]> {
     const allFaculties = await db.select().from(faculties).orderBy(faculties.name);
-    
+
     const result = await Promise.all(allFaculties.map(async (f) => {
       const depts = await db.select({ count: count() }).from(departments).where(eq(departments.facultyId, f.id));
       const teachers = await db.select({ count: count() }).from(users).where(and(eq(users.facultyId, f.id), eq(users.role, "oqituvchi")));
       const students = await db.select({ count: count() }).from(users).where(and(eq(users.facultyId, f.id), eq(users.role, "talaba")));
-      
+
       return {
         ...f,
         departmentsCount: Number(depts[0]?.count) || 0,
@@ -207,7 +207,7 @@ export const storage: IStorage = {
         studentsCount: Number(students[0]?.count) || 0,
       };
     }));
-    
+
     return result;
   },
 
@@ -227,18 +227,18 @@ export const storage: IStorage = {
 
   async getDepartments(): Promise<(Department & { facultyName: string; groupsCount: number })[]> {
     const allDepartments = await db.select().from(departments).orderBy(departments.name);
-    
+
     const result = await Promise.all(allDepartments.map(async (d) => {
       const [faculty] = await db.select().from(faculties).where(eq(faculties.id, d.facultyId)).limit(1);
       const groups = await db.select({ count: count() }).from(studentGroups).where(eq(studentGroups.departmentId, d.id));
-      
+
       return {
         ...d,
         facultyName: faculty?.name || "",
         groupsCount: Number(groups[0]?.count) || 0,
       };
     }));
-    
+
     return result;
   },
 
@@ -258,12 +258,12 @@ export const storage: IStorage = {
 
   async getGroups(): Promise<(StudentGroup & { departmentName: string; facultyName: string; studentsCount: number })[]> {
     const allGroups = await db.select().from(studentGroups).orderBy(studentGroups.name);
-    
+
     const result = await Promise.all(allGroups.map(async (g) => {
       const [dept] = await db.select().from(departments).where(eq(departments.id, g.departmentId)).limit(1);
       const [faculty] = dept ? await db.select().from(faculties).where(eq(faculties.id, dept.facultyId)).limit(1) : [null];
       const students = await db.select({ count: count() }).from(users).where(and(eq(users.groupId, g.id), eq(users.role, "talaba")));
-      
+
       return {
         ...g,
         departmentName: dept?.name || "",
@@ -271,7 +271,7 @@ export const storage: IStorage = {
         studentsCount: Number(students[0]?.count) || 0,
       };
     }));
-    
+
     return result;
   },
 
@@ -291,12 +291,12 @@ export const storage: IStorage = {
 
   async getSubjects(): Promise<(Subject & { departmentName: string; facultyName: string; teachersCount: number })[]> {
     const allSubjects = await db.select().from(subjects).orderBy(subjects.name);
-    
+
     const result = await Promise.all(allSubjects.map(async (s) => {
       const [dept] = s.departmentId ? await db.select().from(departments).where(eq(departments.id, s.departmentId)).limit(1) : [null];
       const [faculty] = dept ? await db.select().from(faculties).where(eq(faculties.id, dept.facultyId)).limit(1) : [null];
       const teachers = await db.select({ count: count() }).from(teacherSubjects).where(eq(teacherSubjects.subjectId, s.id));
-      
+
       return {
         ...s,
         departmentName: dept?.name || "",
@@ -304,7 +304,7 @@ export const storage: IStorage = {
         teachersCount: Number(teachers[0]?.count) || 0,
       };
     }));
-    
+
     return result;
   },
 
@@ -325,7 +325,7 @@ export const storage: IStorage = {
     const userId = await this.getNextUserId("T");
     const password = data.password || generatePassword(userId);
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     const [user] = await db.insert(users).values({
       userId,
       role: "oqituvchi",
@@ -337,7 +337,7 @@ export const storage: IStorage = {
       passwordHash,
       isActive: true,
     }).returning();
-    
+
     if (data.subjectIds && data.subjectIds.length > 0) {
       await db.insert(teacherSubjects).values(
         data.subjectIds.map((subjectId: number) => ({
@@ -346,25 +346,25 @@ export const storage: IStorage = {
         }))
       );
     }
-    
+
     return { user, password };
   },
 
   async getTeachers(): Promise<(User & { facultyName: string; departmentName: string; subjects: { id: number; name: string }[] })[]> {
     const allTeachers = await db.select().from(users).where(eq(users.role, "oqituvchi")).orderBy(users.fullName);
-    
+
     const result = await Promise.all(allTeachers.map(async (t) => {
       const [faculty] = t.facultyId ? await db.select().from(faculties).where(eq(faculties.id, t.facultyId)).limit(1) : [null];
       const [dept] = t.departmentId ? await db.select().from(departments).where(eq(departments.id, t.departmentId)).limit(1) : [null];
       const teacherSubjectsList = await db.select().from(teacherSubjects).where(eq(teacherSubjects.teacherId, t.id));
-      
+
       const subjectDetails = await Promise.all(
         teacherSubjectsList.map(async (ts) => {
           const [subject] = await db.select().from(subjects).where(eq(subjects.id, ts.subjectId)).limit(1);
           return subject ? { id: subject.id, name: subject.name } : null;
         })
       );
-      
+
       return {
         ...t,
         facultyName: faculty?.name || "",
@@ -372,7 +372,7 @@ export const storage: IStorage = {
         subjects: subjectDetails.filter(Boolean) as { id: number; name: string }[],
       };
     }));
-    
+
     return result;
   },
 
@@ -383,9 +383,9 @@ export const storage: IStorage = {
     if (data.phone !== undefined) updateData.phone = data.phone || null;
     if (data.facultyId) updateData.facultyId = parseInt(String(data.facultyId));
     if (data.departmentId) updateData.departmentId = parseInt(String(data.departmentId));
-    
+
     const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
-    
+
     if (data.subjectIds !== undefined) {
       await db.delete(teacherSubjects).where(eq(teacherSubjects.teacherId, id));
       if (data.subjectIds.length > 0) {
@@ -397,7 +397,7 @@ export const storage: IStorage = {
         );
       }
     }
-    
+
     return user;
   },
 
@@ -419,10 +419,10 @@ export const storage: IStorage = {
     const userId = await this.getNextUserId("S");
     const password = customPassword || generatePassword(userId);
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     const group = data.groupId ? await db.select().from(studentGroups).where(eq(studentGroups.id, parseInt(String(data.groupId)))).limit(1) : [];
     const dept = group[0] ? await db.select().from(departments).where(eq(departments.id, group[0].departmentId)).limit(1) : [];
-    
+
     const [user] = await db.insert(users).values({
       userId,
       role: "talaba",
@@ -434,18 +434,18 @@ export const storage: IStorage = {
       passwordHash,
       isActive: true,
     }).returning();
-    
+
     return { user, password };
   },
 
   async getStudents(): Promise<(User & { facultyName: string; departmentName: string; groupName: string; courseYear: number })[]> {
     const allStudents = await db.select().from(users).where(eq(users.role, "talaba")).orderBy(users.fullName);
-    
+
     const result = await Promise.all(allStudents.map(async (s) => {
       const [group] = s.groupId ? await db.select().from(studentGroups).where(eq(studentGroups.id, s.groupId)).limit(1) : [null];
       const [dept] = s.departmentId ? await db.select().from(departments).where(eq(departments.id, s.departmentId)).limit(1) : [null];
       const [faculty] = s.facultyId ? await db.select().from(faculties).where(eq(faculties.id, s.facultyId)).limit(1) : [null];
-      
+
       return {
         ...s,
         facultyName: faculty?.name || "",
@@ -454,7 +454,7 @@ export const storage: IStorage = {
         courseYear: group?.courseYear || 1,
       };
     }));
-    
+
     return result;
   },
 
@@ -462,11 +462,11 @@ export const storage: IStorage = {
     const updateData: Partial<InsertUser> = {};
     if (data.fullName) updateData.fullName = data.fullName;
     if (data.email !== undefined) updateData.email = data.email || null;
-    
+
     if (data.groupId) {
       const groupId = parseInt(String(data.groupId));
       updateData.groupId = groupId;
-      
+
       const [group] = await db.select().from(studentGroups).where(eq(studentGroups.id, groupId)).limit(1);
       if (group) {
         updateData.departmentId = group.departmentId;
@@ -476,7 +476,7 @@ export const storage: IStorage = {
         }
       }
     }
-    
+
     const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
     return user;
   },
@@ -499,7 +499,7 @@ export const storage: IStorage = {
     const [teachersCount] = await db.select({ count: count() }).from(users).where(eq(users.role, "oqituvchi"));
     const [studentsCount] = await db.select({ count: count() }).from(users).where(eq(users.role, "talaba"));
     const [activeExamsCount] = await db.select({ count: count() }).from(exams).where(eq(exams.status, "active"));
-    
+
     return {
       faculties: Number(facultiesCount?.count) || 0,
       teachers: Number(teachersCount?.count) || 0,
@@ -520,14 +520,14 @@ export const storage: IStorage = {
   async getTeacherSubjects(teacherId: number): Promise<Subject[]> {
     const assignments = await db.select().from(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
     if (assignments.length === 0) return [];
-    
+
     const subjectIds = assignments.map((a) => a.subjectId);
     return db.select().from(subjects).where(inArray(subjects.id, subjectIds)).orderBy(subjects.name);
   },
 
   async getTeacherLectures(teacherId: number): Promise<(Lecture & { subjectName: string })[]> {
     const allLectures = await db.select().from(lectures).where(eq(lectures.teacherId, teacherId)).orderBy(desc(lectures.uploadedAt));
-    
+
     const result = await Promise.all(allLectures.map(async (l) => {
       const [subject] = await db.select().from(subjects).where(eq(subjects.id, l.subjectId)).limit(1);
       return {
@@ -535,7 +535,7 @@ export const storage: IStorage = {
         subjectName: subject?.name || "",
       };
     }));
-    
+
     return result;
   },
 
@@ -573,11 +573,11 @@ export const storage: IStorage = {
   async getStudentInfo(studentId: number): Promise<{ groupName: string; courseYear: number; facultyName: string; departmentName: string }> {
     const [student] = await db.select().from(users).where(eq(users.id, studentId)).limit(1);
     if (!student) return { groupName: "", courseYear: 1, facultyName: "", departmentName: "" };
-    
+
     const [group] = student.groupId ? await db.select().from(studentGroups).where(eq(studentGroups.id, student.groupId)).limit(1) : [null];
     const [dept] = student.departmentId ? await db.select().from(departments).where(eq(departments.id, student.departmentId)).limit(1) : [null];
     const [faculty] = student.facultyId ? await db.select().from(faculties).where(eq(faculties.id, student.facultyId)).limit(1) : [null];
-    
+
     return {
       groupName: group?.name || "",
       courseYear: group?.courseYear || 1,
@@ -589,18 +589,18 @@ export const storage: IStorage = {
   async getStudentUpcomingExams(studentId: number): Promise<any[]> {
     const [student] = await db.select().from(users).where(eq(users.id, studentId)).limit(1);
     if (!student?.groupId) return [];
-    
+
     const today = new Date().toISOString().split("T")[0];
     const allExams = await db.select().from(exams)
       .where(and(gte(exams.examDate, today), eq(exams.status, "scheduled")))
       .orderBy(exams.examDate, exams.startTime);
-    
+
     const relevantExams = allExams.filter((e) => e.targetGroups?.includes(student.groupId!));
-    
+
     const result = await Promise.all(relevantExams.map(async (exam) => {
       const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
       const [teacher] = await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1);
-      
+
       return {
         id: exam.id,
         name: exam.name,
@@ -612,31 +612,31 @@ export const storage: IStorage = {
         status: exam.status,
       };
     }));
-    
+
     return result;
   },
 
   async getStudentExams(studentId: number): Promise<any[]> {
     const [student] = await db.select().from(users).where(eq(users.id, studentId)).limit(1);
     if (!student?.groupId) return [];
-    
+
     const allExams = await db.select().from(exams).orderBy(desc(exams.examDate), desc(exams.startTime));
     const relevantExams = allExams.filter((e) => e.targetGroups?.includes(student.groupId!));
-    
+
     const result = await Promise.all(relevantExams.map(async (exam) => {
       const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
       const [teacher] = await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1);
-      
+
       const [session] = await db.select().from(examSessions)
         .where(and(eq(examSessions.examId, exam.id), eq(examSessions.studentId, studentId)))
         .limit(1);
-      
+
       let totalScore = 0;
       if (session) {
         const answers = await db.select().from(studentAnswers).where(eq(studentAnswers.sessionId, session.id));
         totalScore = answers.reduce((sum, a) => sum + (parseFloat(a.aiScore || "0") || 0), 0);
       }
-      
+
       return {
         id: exam.id,
         name: exam.name,
@@ -652,28 +652,28 @@ export const storage: IStorage = {
         score: Math.round(totalScore * 10) / 10,
       };
     }));
-    
+
     return result;
   },
 
   async getStudentExamResult(studentId: number, examId: number): Promise<any> {
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
     if (!exam) throw new Error("Imtihon topilmadi");
-    
+
     const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
-    
+
     const [session] = await db.select().from(examSessions)
       .where(and(eq(examSessions.examId, examId), eq(examSessions.studentId, studentId)))
       .limit(1);
-    
+
     let answeredCount = 0;
     let totalQuestions = exam.questionsPerTicket || 5;
-    
+
     if (session) {
       const answers = await db.select().from(studentAnswers).where(eq(studentAnswers.sessionId, session.id));
       answeredCount = answers.filter(a => a.answerText && a.answerText.trim().length > 0).length;
     }
-    
+
     return {
       examName: exam.name,
       subjectName: subject?.name || "",
@@ -687,11 +687,11 @@ export const storage: IStorage = {
   async getTeacherStats(teacherId: number): Promise<{ subjectsCount: number; lecturesCount: number; todayExamsCount: number }> {
     const subjectsAssigned = await db.select({ count: count() }).from(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
     const lecturesUploaded = await db.select({ count: count() }).from(lectures).where(eq(lectures.teacherId, teacherId));
-    
+
     const today = new Date().toISOString().split("T")[0];
     const todayExams = await db.select({ count: count() }).from(exams)
       .where(and(eq(exams.teacherId, teacherId), eq(exams.examDate, today)));
-    
+
     return {
       subjectsCount: Number(subjectsAssigned[0]?.count) || 0,
       lecturesCount: Number(lecturesUploaded[0]?.count) || 0,
@@ -704,15 +704,15 @@ export const storage: IStorage = {
     const todayExams = await db.select().from(exams)
       .where(and(eq(exams.teacherId, teacherId), eq(exams.examDate, today)))
       .orderBy(exams.startTime);
-    
+
     const result = await Promise.all(todayExams.map(async (exam) => {
       const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
-      
+
       const groupNames = await Promise.all((exam.targetGroups || []).map(async (gId) => {
         const [group] = await db.select().from(studentGroups).where(eq(studentGroups.id, gId)).limit(1);
         return group?.name || "";
       }));
-      
+
       return {
         id: exam.id,
         name: exam.name,
@@ -722,20 +722,20 @@ export const storage: IStorage = {
         status: exam.status,
       };
     }));
-    
+
     return result;
   },
 
   async getTeacherQuestions(teacherId: number, subjectId: number): Promise<any[]> {
     const teacherLectures = await db.select().from(lectures)
       .where(and(eq(lectures.teacherId, teacherId), eq(lectures.subjectId, subjectId)));
-    
+
     const lectureIds = teacherLectures.map((l) => l.id);
     if (lectureIds.length === 0) return [];
-    
+
     const allQuestions = await db.select().from(questions)
       .where(inArray(questions.lectureId, lectureIds));
-    
+
     return allQuestions.map((q) => {
       const lecture = teacherLectures.find((l) => l.id === q.lectureId);
       return {
@@ -749,18 +749,18 @@ export const storage: IStorage = {
     const allExams = await db.select().from(exams)
       .where(eq(exams.teacherId, teacherId))
       .orderBy(desc(exams.examDate));
-    
+
     const result = await Promise.all(allExams.map(async (exam) => {
       const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
-      
+
       const ticketCount = await db.select({ count: count() }).from(examTickets)
         .where(eq(examTickets.examId, exam.id));
-      
+
       const groupNames = await Promise.all((exam.targetGroups || []).map(async (gId) => {
         const [group] = await db.select().from(studentGroups).where(eq(studentGroups.id, gId)).limit(1);
         return group?.name || "";
       }));
-      
+
       return {
         id: exam.id,
         name: exam.name,
@@ -774,7 +774,7 @@ export const storage: IStorage = {
         questionsPerTicket: exam.questionsPerTicket,
       };
     }));
-    
+
     return result;
   },
 
@@ -802,30 +802,30 @@ export const storage: IStorage = {
       examType: data.examType || "yozma",
       status: "scheduled",
     }).returning();
-    
+
     const studentsInGroups = await db.select().from(users)
       .where(and(eq(users.role, "talaba"), inArray(users.groupId!, data.groupIds)));
-    
+
     const questionPool = [...data.questionIds];
     const usedCombinations = new Set<string>();
-    
+
     for (const student of studentsInGroups) {
       let ticketQuestions: number[] = [];
       let attempts = 0;
       const maxAttempts = 100;
-      
+
       while (attempts < maxAttempts) {
         const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
         ticketQuestions = shuffled.slice(0, data.questionsPerTicket);
         const combinationKey = ticketQuestions.sort((a, b) => a - b).join(",");
-        
+
         if (!usedCombinations.has(combinationKey) || attempts === maxAttempts - 1) {
           usedCombinations.add(combinationKey);
           break;
         }
         attempts++;
       }
-      
+
       await db.insert(examTickets).values({
         examId: exam.id,
         assignedTo: student.id,
@@ -833,7 +833,7 @@ export const storage: IStorage = {
         ticketNumber: studentsInGroups.indexOf(student) + 1,
       });
     }
-    
+
     return { examId: exam.id, ticketCount: studentsInGroups.length };
   },
 
@@ -847,11 +847,11 @@ export const storage: IStorage = {
     const [exam] = await db.select().from(exams)
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
-    
+
     if (!exam || exam.status !== "scheduled") {
       throw new Error("Imtihonni o'chirib bo'lmaydi");
     }
-    
+
     await db.delete(examTickets).where(eq(examTickets.examId, examId));
     await db.delete(exams).where(eq(exams.id, examId));
   },
@@ -859,19 +859,19 @@ export const storage: IStorage = {
   async getStudentExamDetails(studentId: number, examId: number): Promise<any> {
     const [student] = await db.select().from(users).where(eq(users.id, studentId)).limit(1);
     if (!student?.groupId) return null;
-    
+
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
     if (!exam || !exam.targetGroups?.includes(student.groupId)) return null;
-    
+
     const [subject] = await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1);
     const [teacher] = await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1);
     const [group] = await db.select().from(studentGroups).where(eq(studentGroups.id, student.groupId)).limit(1);
     const [faculty] = student.facultyId ? await db.select().from(faculties).where(eq(faculties.id, student.facultyId)).limit(1) : [null];
-    
+
     const now = new Date();
     const examDateTime = new Date(`${exam.examDate}T${exam.startTime}`);
     const canStart = exam.status === "active" || (now >= examDateTime && exam.status === "scheduled");
-    
+
     return {
       id: exam.id,
       name: exam.name,
@@ -896,28 +896,28 @@ export const storage: IStorage = {
     const [ticket] = await db.select().from(examTickets)
       .where(and(eq(examTickets.examId, examId), eq(examTickets.assignedTo, studentId)))
       .limit(1);
-    
+
     if (!ticket) {
       throw new Error("Sizga bilet ajratilmagan");
     }
-    
+
     const existingSession = await db.select().from(examSessions)
       .where(and(eq(examSessions.ticketId, ticket.id), eq(examSessions.studentId, studentId)))
       .limit(1);
-    
+
     if (existingSession.length > 0 && existingSession[0].status === "submitted") {
       throw new Error("Siz bu imtihonni allaqachon topshirgansiz");
     }
-    
+
     if (existingSession.length > 0) {
       return { sessionId: existingSession[0].id };
     }
-    
+
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
     if (!exam) throw new Error("Imtihon topilmadi");
-    
+
     const startedAt = new Date();
-    
+
     const [session] = await db.insert(examSessions).values({
       examId,
       ticketId: ticket.id,
@@ -926,7 +926,7 @@ export const storage: IStorage = {
       status: "active",
       violationsCount: 0,
     }).returning();
-    
+
     return { sessionId: session.id };
   },
 
@@ -934,35 +934,35 @@ export const storage: IStorage = {
     const [ticket] = await db.select().from(examTickets)
       .where(and(eq(examTickets.examId, examId), eq(examTickets.assignedTo, studentId)))
       .limit(1);
-    
+
     if (!ticket) return null;
-    
+
     const [session] = await db.select().from(examSessions)
       .where(and(eq(examSessions.ticketId, ticket.id), eq(examSessions.studentId, studentId)))
       .limit(1);
-    
+
     if (!session) return null;
-    
+
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
     const [subject] = exam ? await db.select().from(subjects).where(eq(subjects.id, exam.subjectId!)).limit(1) : [null];
     const [teacher] = exam ? await db.select().from(users).where(eq(users.id, exam.teacherId!)).limit(1) : [null];
-    
+
     const ticketQuestions = await db.select().from(questions)
       .where(inArray(questions.id, ticket.questionIds || []));
-    
+
     const savedAnswers = await db.select().from(studentAnswers)
       .where(eq(studentAnswers.sessionId, session.id));
-    
+
     const savedAnswersMap: Record<number, string> = {};
     savedAnswers.forEach((a) => {
       savedAnswersMap[a.questionId!] = a.answerText || "";
     });
-    
+
     const durationMs = (exam?.durationMinutes || 60) * 60 * 1000;
-    const endTime = session.startedAt 
+    const endTime = session.startedAt
       ? new Date(new Date(session.startedAt).getTime() + durationMs).toISOString()
       : null;
-    
+
     return {
       sessionId: session.id,
       examId: exam?.id,
@@ -986,7 +986,7 @@ export const storage: IStorage = {
     const existing = await db.select().from(studentAnswers)
       .where(and(eq(studentAnswers.sessionId, sessionId), eq(studentAnswers.questionId, questionId)))
       .limit(1);
-    
+
     if (existing.length > 0) {
       await db.update(studentAnswers)
         .set({ answerText, answeredAt: new Date() })
@@ -1006,9 +1006,9 @@ export const storage: IStorage = {
     if (session) {
       const currentViolations = session.violationDetails ? JSON.parse(JSON.stringify(session.violationDetails)) : [];
       currentViolations.push({ type, timestamp: new Date() });
-      
+
       await db.update(examSessions)
-        .set({ 
+        .set({
           violationsCount: (session.violationsCount || 0) + 1,
           violationDetails: currentViolations,
         })
@@ -1042,7 +1042,7 @@ export const storage: IStorage = {
       .from(studentAnswers)
       .innerJoin(questions, eq(studentAnswers.questionId, questions.id))
       .where(eq(studentAnswers.sessionId, sessionId));
-    
+
     return results.map(r => ({
       answerId: r.answerId,
       questionId: r.questionId || 0,
@@ -1055,7 +1055,7 @@ export const storage: IStorage = {
 
   async updateAnswerGrade(answerId: number, score: string, feedback: object): Promise<void> {
     await db.update(studentAnswers)
-      .set({ 
+      .set({
         aiScore: score,
         aiFeedback: feedback,
       })
@@ -1084,7 +1084,7 @@ export const storage: IStorage = {
       .innerJoin(examTickets, eq(examSessions.ticketId, examTickets.id))
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
       .leftJoin(studentGroups, eq(users.groupId, studentGroups.id));
-    
+
     let sessions;
     if (examIdFilter) {
       sessions = await baseQuery
@@ -1095,7 +1095,7 @@ export const storage: IStorage = {
         .where(eq(exams.teacherId, teacherId))
         .orderBy(desc(examSessions.submittedAt));
     }
-    
+
     const results = await Promise.all(sessions.map(async (session) => {
       const answers = await db
         .select({
@@ -1103,10 +1103,10 @@ export const storage: IStorage = {
         })
         .from(studentAnswers)
         .where(eq(studentAnswers.sessionId, session.sessionId));
-      
+
       const totalScore = answers.reduce((sum, a) => sum + (parseFloat(a.aiScore || "0")), 0);
       const maxScore = answers.length * 15;
-      
+
       return {
         ...session,
         totalScore,
@@ -1114,7 +1114,7 @@ export const storage: IStorage = {
         answersCount: answers.length,
       };
     }));
-    
+
     return results;
   },
 
@@ -1143,9 +1143,9 @@ export const storage: IStorage = {
       .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
       .where(and(eq(examSessions.id, sessionId), eq(exams.teacherId, teacherId)))
       .limit(1);
-    
+
     if (!session) return null;
-    
+
     const answers = await db
       .select({
         id: studentAnswers.id,
@@ -1163,7 +1163,7 @@ export const storage: IStorage = {
       .from(studentAnswers)
       .innerJoin(questions, eq(studentAnswers.questionId, questions.id))
       .where(eq(studentAnswers.sessionId, sessionId));
-    
+
     return {
       ...session,
       answers,
@@ -1172,7 +1172,7 @@ export const storage: IStorage = {
 
   async updateAnswerManualScore(answerId: number, score: number, comment: string): Promise<void> {
     await db.update(studentAnswers)
-      .set({ 
+      .set({
         manualScore: score.toString(),
         manualComment: comment,
       })
@@ -1192,9 +1192,9 @@ export const storage: IStorage = {
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
-    
+
     if (!exam) return null;
-    
+
     const sessions = await db
       .select({
         sessionId: examSessions.id,
@@ -1211,7 +1211,7 @@ export const storage: IStorage = {
       .innerJoin(examTickets, eq(examSessions.ticketId, examTickets.id))
       .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
       .where(eq(examSessions.examId, examId));
-    
+
     const results = await Promise.all(sessions.map(async (session) => {
       const answers = await db
         .select({
@@ -1220,13 +1220,13 @@ export const storage: IStorage = {
         })
         .from(studentAnswers)
         .where(eq(studentAnswers.sessionId, session.sessionId));
-      
+
       const totalScore = answers.reduce((sum, a) => {
         const score = a.manualScore ? parseFloat(a.manualScore) : parseFloat(a.aiScore || "0");
         return sum + score;
       }, 0);
       const maxScore = answers.length * 15;
-      
+
       return {
         ...session,
         totalScore,
@@ -1234,7 +1234,7 @@ export const storage: IStorage = {
         percentage: maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0,
       };
     }));
-    
+
     return {
       exam,
       results,
@@ -1257,13 +1257,13 @@ export const storage: IStorage = {
       .innerJoin(subjects, eq(exams.subjectId, subjects.id))
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
-    
+
     if (!exam) throw new Error("Imtihon topilmadi");
-    
+
     const groupIds = exam.targetGroups || [];
-    
+
     let studentsFromGroups: { id: number; fullName: string; groupId: number | null; groupName: string | null }[] = [];
-    
+
     if (groupIds.length > 0) {
       studentsFromGroups = await db
         .select({
@@ -1276,7 +1276,7 @@ export const storage: IStorage = {
         .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
         .where(and(eq(users.role, "talaba"), inArray(users.groupId, groupIds)));
     }
-    
+
     const studentsFromSessions = await db
       .select({
         id: users.id,
@@ -1288,7 +1288,7 @@ export const storage: IStorage = {
       .innerJoin(users, eq(examSessions.studentId, users.id))
       .leftJoin(studentGroups, eq(users.groupId, studentGroups.id))
       .where(eq(examSessions.examId, examId));
-    
+
     const studentMap = new Map<number, { id: number; fullName: string; groupId: number | null; groupName: string | null }>();
     for (const s of studentsFromGroups) {
       studentMap.set(s.id, s);
@@ -1299,7 +1299,7 @@ export const storage: IStorage = {
       }
     }
     const allStudents = Array.from(studentMap.values());
-    
+
     const sessions = await db
       .select({
         id: examSessions.id,
@@ -1312,11 +1312,11 @@ export const storage: IStorage = {
       })
       .from(examSessions)
       .where(eq(examSessions.examId, examId));
-    
+
     const sessionMap = new Map(sessions.map(s => [s.studentId, s]));
-    
+
     const sessionIds = sessions.map(s => s.id);
-    const allAnswers = sessionIds.length > 0 
+    const allAnswers = sessionIds.length > 0
       ? await db.select().from(studentAnswers).where(inArray(studentAnswers.sessionId, sessionIds))
       : [];
     const answersMap = new Map<number, typeof allAnswers>();
@@ -1326,32 +1326,32 @@ export const storage: IStorage = {
       }
       answersMap.get(answer.sessionId)!.push(answer);
     }
-    
+
     const ticketIds = sessions.filter(s => s.ticketId).map(s => s.ticketId!);
     const allTickets = ticketIds.length > 0
       ? await db.select().from(examTickets).where(inArray(examTickets.id, ticketIds))
       : [];
     const ticketsMap = new Map(allTickets.map(t => [t.id, t]));
-    
+
     const [examForQuestionCount] = await db.select({ questionsPerTicket: exams.questionsPerTicket })
       .from(exams).where(eq(exams.id, examId)).limit(1);
     const defaultQuestionCount = examForQuestionCount?.questionsPerTicket || 5;
-    
+
     const students = allStudents.map((student) => {
       const session = sessionMap.get(student.id);
       let answeredCount = 0;
       let totalQuestions = defaultQuestionCount;
       let timeSpent = "00:00";
-      
+
       if (session) {
         if (session.ticketId) {
           const ticket = ticketsMap.get(session.ticketId);
           totalQuestions = ticket?.questionIds?.length || defaultQuestionCount;
         }
-        
+
         const sessionAnswers = answersMap.get(session.id) || [];
         answeredCount = sessionAnswers.filter(a => a.answerText && a.answerText.trim().length > 0).length;
-        
+
         if (session.startedAt) {
           const startTime = new Date(session.startedAt).getTime();
           const endTime = session.submittedAt ? new Date(session.submittedAt).getTime() : Date.now();
@@ -1361,12 +1361,12 @@ export const storage: IStorage = {
           timeSpent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
         }
       }
-      
+
       let status: "waiting" | "in_progress" | "submitted" | "disqualified" = "waiting";
       if (session?.status === "submitted") status = "submitted";
       else if (session?.status === "in_progress") status = "in_progress";
       else if ((session?.tabSwitches || 0) >= 3) status = "disqualified";
-      
+
       return {
         id: student.id,
         fullName: student.fullName,
@@ -1379,16 +1379,16 @@ export const storage: IStorage = {
         sessionId: session?.id,
       };
     });
-    
+
     const started = students.filter(s => s.status !== "waiting").length;
     const submitted = students.filter(s => s.status === "submitted").length;
     const problematic = students.filter(s => s.tabSwitches > 0).length;
-    
+
     const now = new Date();
     const examStart = new Date(`${exam.examDate}T${exam.startTime}`);
     const examEnd = new Date(examStart.getTime() + (exam.durationMinutes || 60) * 60 * 1000);
     const remainingSeconds = Math.max(0, Math.floor((examEnd.getTime() - now.getTime()) / 1000));
-    
+
     const activities = await db
       .select({
         id: activityLogs.id,
@@ -1401,20 +1401,20 @@ export const storage: IStorage = {
       .where(sql`${activityLogs.details}->>'examId' = ${examId.toString()}`)
       .orderBy(desc(activityLogs.createdAt))
       .limit(50);
-    
+
     const activityList = await Promise.all(activities.map(async (a) => {
       const [student] = await db.select().from(users).where(eq(users.id, a.userId || 0)).limit(1);
       const details = a.details as any;
-      
+
       let type: "start" | "answer" | "warning" | "disqualified" | "submit" = "start";
       let actionText = a.action;
-      
+
       if (a.action.includes("savol")) type = "answer";
       else if (a.action.includes("sahifadan chiqdi") || a.action.includes("ogohlantirish")) {
         type = details?.count >= 3 ? "disqualified" : "warning";
       }
       else if (a.action.includes("topshir")) type = "submit";
-      
+
       return {
         id: a.id,
         studentName: student?.fullName || "Noma'lum",
@@ -1423,7 +1423,7 @@ export const storage: IStorage = {
         timestamp: a.createdAt,
       };
     }));
-    
+
     return {
       exam: {
         id: exam.id,
@@ -1450,9 +1450,9 @@ export const storage: IStorage = {
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
     if (!exam) throw new Error("Imtihon topilmadi");
-    
+
     await db.update(exams).set({ status: "completed" }).where(eq(exams.id, examId));
-    
+
     await db.update(examSessions)
       .set({ status: "submitted", submittedAt: new Date() })
       .where(and(eq(examSessions.examId, examId), eq(examSessions.status, "in_progress")));
@@ -1463,7 +1463,7 @@ export const storage: IStorage = {
       .where(and(eq(exams.id, examId), eq(exams.teacherId, teacherId)))
       .limit(1);
     if (!exam) throw new Error("Imtihon topilmadi");
-    
+
     const newDuration = (exam.durationMinutes || 60) + minutes;
     await db.update(exams).set({ durationMinutes: newDuration }).where(eq(exams.id, examId));
   },
