@@ -293,7 +293,7 @@ export async function registerRoutes(
       res.json({ success: true, userId: user.userId });
     } catch (error) {
       console.error("Setup error:", error);
-      res.status(500).json({ error: "Tizim sozlashda xatolik" });
+      res.status(500).json({ error: "Tizim sozlashda xatolik: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
