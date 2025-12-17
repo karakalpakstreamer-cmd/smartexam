@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(set PGPASSWORD=postgres123:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\createdb.exe\" -U postgres -h localhost smartexam)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\":*)",
+      "Bash(npm install)",
+      "Bash(npm run db:push:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(if not exist \"C:\\Projects\\SmartExamweb\\SmartExam\\test\\data\" mkdir \"C:\\Projects\\SmartExamweb\\SmartExam\\test\\data\")",
+      "Bash(cmd /c:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\" -U postgres -h localhost -c \"SELECT datname FROM pg_database WHERE datname=''smartexam'';\")",
+      "Bash(npx tsx:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\" -U postgres -h localhost -d smartexam -c \"UPDATE users SET password_hash = ''$2b$10$7574VIi58ncWosakWd3rluAEduZI16pHlAeUWuL1U5nv85uP4L8pi'' WHERE user_id = ''R001'';\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\" -U postgres -h localhost -d smartexam -c \"SELECT user_id, role, full_name, LEFT(password_hash, 30) as hash_prefix, is_active FROM users WHERE user_id = ''R001'';\")",
+      "Bash(\"\")",
+      "Bash(del C:ProjectsSmartExamwebSmartExamcheck-user.ts)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\" -U postgres -h localhost -d smartexam -c \"SELECT user_id, role, full_name, is_active FROM users WHERE user_id = ''R002'';\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

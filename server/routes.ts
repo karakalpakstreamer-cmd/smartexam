@@ -20,7 +20,7 @@ declare module "express-session" {
 }
 
 const upload = multer({
-  dest: "uploads/",
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = [".pdf", ".doc", ".docx"];
@@ -49,14 +49,13 @@ function requireRole(...roles: string[]) {
   };
 }
 
-async function extractTextFromFile(filePath: string, fileType: string): Promise<string> {
+async function extractTextFromFile(buffer: Buffer, fileType: string): Promise<string> {
   try {
     if (fileType === "pdf") {
-      const dataBuffer = fs.readFileSync(filePath);
-      const data = await pdfParse(dataBuffer);
+      const data = await pdfParse(buffer);
       return data.text;
     } else if (fileType === "docx" || fileType === "doc") {
-      const result = await mammoth.extractRawText({ path: filePath });
+      const result = await mammoth.extractRawText({ buffer });
       return result.value;
     }
     return "";
@@ -306,11 +305,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Barcha maydonlarni to'ldiring" });
       }
 
+      console.log(`[LOGIN] Attempting login for userId: ${userId}, role: ${role}`);
+      
       const user = await storage.validateUserLogin(userId, password, role);
       if (!user) {
+        console.log(`[LOGIN] Login failed: Invalid credentials for userId: ${userId}, role: ${role}`);
         return res.status(401).json({ error: "ID yoki parol noto'g'ri" });
       }
 
+      console.log(`[LOGIN] Login successful for userId: ${userId}, user.id: ${user.id}`);
+      
       req.session.userId = user.id;
       req.session.role = user.role;
 
@@ -324,7 +328,8 @@ export async function registerRoutes(
 
       res.json({ user: { ...user, passwordHash: undefined } });
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("[LOGIN] Login error details:", error);
+      console.error("[LOGIN] Error stack:", error instanceof Error ? error.stack : "No stack trace");
       res.status(500).json({ error: "Tizimga kirishda xatolik" });
     }
   });
@@ -751,14 +756,18 @@ export async function registerRoutes(
       }
 
       const ext = path.extname(file.originalname).toLowerCase().replace(".", "");
-      const contentText = await extractTextFromFile(file.path, ext);
+      const contentText = await extractTextFromFile(file.buffer, ext);
 
+      // In Vercel serverless we cannot save files to disk permanently
+      // So we will just store the path as a placeholder or empty string
+      // The contentText is what matters for AI features
+      
       const lecture = await storage.createLecture({
         subjectId: parseInt(subjectId),
         teacherId: req.session.userId!,
         title,
         fileName: file.originalname,
-        filePath: file.path,
+        filePath: "stored-in-db-content-only", // Placeholder for serverless
         fileSize: file.size,
         fileType: ext,
         contentText,

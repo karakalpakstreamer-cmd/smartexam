@@ -28,7 +28,7 @@ const allowlist = [
 // These must be externalized to avoid runtime errors
 const forceExternal = [
   "@google/generative-ai",
-  "@neondatabase/serverless", 
+  "pg",
   "connect-pg-simple",
   "drizzle-orm",
   "drizzle-zod",
