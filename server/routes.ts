@@ -8,9 +8,8 @@ import { storage } from "./storage";
 import { GoogleGenAI } from "@google/genai";
 import * as mammoth from "mammoth";
 
-// pdf-parse is a CommonJS module - use require-style import
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+// pdf-parse is a CommonJS module
+import pdfParse from "pdf-parse";
 
 declare module "express-session" {
   interface SessionData {
@@ -199,12 +198,12 @@ JAVOBNI FAQAT JSON FORMATDA BER:
       text = respAny.candidates[0].content.parts.map((p: any) => p?.text || "").join("");
     }
     console.log("AI grading response:", text.substring(0, 200));
-    
+
     if (!text || text.trim().length === 0) {
       console.log("Empty text response from AI");
       return getDefaultGradingResult(studentAnswer);
     }
-    
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.log("No JSON match found in grading response");
@@ -306,7 +305,7 @@ export async function registerRoutes(
       }
 
       console.log(`[LOGIN] Attempting login for userId: ${userId}, role: ${role}`);
-      
+
       const user = await storage.validateUserLogin(userId, password, role);
       if (!user) {
         console.log(`[LOGIN] Login failed: Invalid credentials for userId: ${userId}, role: ${role}`);
@@ -314,7 +313,7 @@ export async function registerRoutes(
       }
 
       console.log(`[LOGIN] Login successful for userId: ${userId}, user.id: ${user.id}`);
-      
+
       req.session.userId = user.id;
       req.session.role = user.role;
 
@@ -761,7 +760,7 @@ export async function registerRoutes(
       // In Vercel serverless we cannot save files to disk permanently
       // So we will just store the path as a placeholder or empty string
       // The contentText is what matters for AI features
-      
+
       const lecture = await storage.createLecture({
         subjectId: parseInt(subjectId),
         teacherId: req.session.userId!,
@@ -858,7 +857,7 @@ export async function registerRoutes(
   app.post("/api/exams", requireAuth, requireRole("oqituvchi"), async (req, res) => {
     try {
       const { name, subjectId, examDate, startTime, durationMinutes, questionsPerTicket, groupIds, questionIds } = req.body;
-      
+
       if (!name || !subjectId || !examDate || !startTime || !groupIds?.length || !questionIds?.length) {
         return res.status(400).json({ error: "Barcha maydonlarni to'ldiring" });
       }
@@ -996,15 +995,15 @@ export async function registerRoutes(
     try {
       const { sessionId } = req.params;
       const parsedSessionId = parseInt(sessionId);
-      
+
       await storage.submitExamSession(parsedSessionId);
-      
+
       res.json({ success: true });
-      
+
       (async () => {
         try {
           const answers = await storage.getSessionAnswersForGrading(parsedSessionId);
-          
+
           for (const answer of answers) {
             try {
               const gradingResult = await gradeAnswerWithAI(
@@ -1013,7 +1012,7 @@ export async function registerRoutes(
                 answer.keywords || [],
                 answer.answerText || ""
               );
-              
+
               await storage.updateAnswerGrade(
                 answer.answerId,
                 gradingResult.score.toString(),
@@ -1028,7 +1027,7 @@ export async function registerRoutes(
           console.error("Background grading error:", bgError);
         }
       })();
-      
+
     } catch (error) {
       res.status(500).json({ error: "Imtihonni topshirishda xatolik" });
     }
