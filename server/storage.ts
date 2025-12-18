@@ -124,6 +124,8 @@ export interface IStorage {
   getExamMonitoringData(examId: number, teacherId: number): Promise<any>;
   endExam(examId: number, teacherId: number): Promise<void>;
   addExamTime(examId: number, teacherId: number, minutes: number): Promise<void>;
+  updateUser(id: number, data: Partial<InsertUser>): Promise<User>;
+  changePassword(userId: number, oldPassword: string, newPassword: string): Promise<boolean>;
 }
 
 function generatePassword(userId: string): string {
@@ -1467,4 +1469,21 @@ export const storage: IStorage = {
     const newDuration = (exam.durationMinutes || 60) + minutes;
     await db.update(exams).set({ durationMinutes: newDuration }).where(eq(exams.id, examId));
   },
+  async updateUser(id: number, data: Partial<InsertUser>): Promise<User> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return user;
+  },
+
+  async changePassword(userId: number, oldPassword: string, newPassword: string): Promise<boolean> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) return false;
+
+    const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isValid) return false;
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+    return true;
+  },
 };
+

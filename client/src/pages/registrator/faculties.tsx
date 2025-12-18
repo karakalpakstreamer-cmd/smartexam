@@ -66,6 +66,7 @@ export default function FacultiesPage() {
       toast({ title: "Muvaffaqiyatli!", description: "Fakultet qo'shildi" });
     },
     onError: (error: Error) => {
+      // API client throws an error with the message from the server response
       toast({
         variant: "destructive",
         title: "Xatolik!",

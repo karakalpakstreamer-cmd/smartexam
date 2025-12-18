@@ -80,61 +80,62 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex">
+    <div className="min-h-screen w-full flex bg-background">
       {/* Left Column - Hero/Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-primary flex-col justify-between p-12 text-primary-foreground overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-primary flex-col justify-between p-16 text-primary-foreground overflow-hidden">
 
-        {/* Abstract Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
+        {/* Abstract Background Pattern - More dynamic */}
+        <div className="absolute inset-0 opacity-[0.08]">
           <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path d="M0 100 C 20 0 50 0 100 100 Z" fill="currentColor" />
+            <path d="M0 0 L100 0 L100 100 Z" fill="currentColor" />
+            <circle cx="50" cy="50" r="40" fill="currentColor" fillOpacity="0.5" />
           </svg>
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-4 mb-12">
             <img
               src="/logo.png"
               alt="SmartExam"
-              className="h-10 w-10 brightness-0 invert"
+              className="h-16 w-16 brightness-0 invert drop-shadow-md"
               data-testid="img-logo"
             />
-            <span className="text-xl font-bold tracking-tight">SmartExam</span>
+            <span className="text-3xl font-bold tracking-tight">SmartExam</span>
           </div>
 
-          <h1 className="text-5xl font-serif font-medium leading-tight mb-6 max-w-lg">
+          <h1 className="text-6xl font-sans font-bold leading-tight mb-8 tracking-tight">
             Ta'lim sifatini <br />
-            yangi bosqichga <br />
+            <span className="text-primary-foreground/90">yangi bosqichga</span> <br />
             olib chiqing.
           </h1>
 
-          <p className="text-lg text-primary-foreground/80 max-w-md font-light leading-relaxed">
+          <p className="text-xl text-primary-foreground/80 max-w-lg font-normal leading-relaxed">
             Adolatli, shaffof va zamonaviy imtihon tizimi.
             Barcha jarayonlar to'liq avtomatlashtirilgan.
           </p>
         </div>
 
-        <div className="relative z-10 flex gap-4 text-sm font-medium text-primary-foreground/60">
-          <span>© 2024 SmartExam</span>
-          <span>Maxfiylik siyosati</span>
-          <span>Yordam</span>
+        <div className="relative z-10 flex gap-6 text-sm font-medium text-primary-foreground/70">
+          <span className="cursor-pointer hover:text-white transition-colors">© 2024 SmartExam</span>
+          <span className="cursor-pointer hover:text-white transition-colors">Maxfiylik siyosati</span>
+          <span className="cursor-pointer hover:text-white transition-colors">Yordam</span>
         </div>
       </div>
 
       {/* Right Column - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-background p-8">
-        <div className="w-full max-w-[440px] space-y-8 animate-slide-in-from-bottom">
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-background px-8 py-12">
+        <div className="w-full max-w-[480px] space-y-10 animate-fade-in-up">
 
-          <div className="text-center lg:text-left space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground" data-testid="text-title">
+          <div className="text-center lg:text-left space-y-3">
+            <h2 className="text-4xl font-extrabold tracking-tight text-foreground" data-testid="text-title">
               Xush kelibsiz
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-lg">
               Davom etish uchun o'z roleingizni tanlang va tizimga kiring.
             </p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Role Selection */}
             <div className="grid grid-cols-3 gap-4">
               {roles.map((role) => {
@@ -145,18 +146,18 @@ export default function LoginPage() {
                     key={role.id}
                     type="button"
                     onClick={() => setSelectedRole(role.id)}
-                    className={`group relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200 ease-in-out cursor-pointer overflow-hidden ${isSelected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border hover:border-primary/30 hover:bg-muted/50"
+                    className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 ease-in-out cursor-pointer overflow-hidden ${isSelected
+                        ? "border-primary bg-primary/5 shadow-md scale-[1.02]"
+                        : "border-border hover:border-primary/40 hover:bg-muted/30"
                       }`}
                     data-testid={`button-role-${role.id}`}
                   >
                     <Icon
-                      className={`w-6 h-6 mb-3 transition-colors ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                      className={`w-7 h-7 mb-3 transition-colors ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                         }`}
                     />
                     <span
-                      className={`text-sm font-medium transition-colors ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                      className={`text-sm font-semibold transition-colors ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                         }`}
                     >
                       {role.label}
@@ -171,7 +172,7 @@ export default function LoginPage() {
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
                   name="userId"
@@ -182,14 +183,14 @@ export default function LoginPage() {
                           <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                           <Input
                             placeholder="ID raqamingiz"
-                            className="pl-12 h-14 bg-muted/30 border-transparent focus:bg-background transition-all duration-200 text-base"
+                            className="pl-12 h-14 bg-muted/40 border-border focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary transition-all duration-200 text-base rounded-xl"
                             data-testid="input-user-id"
-                            autoComplete="off" // Prevent ugly browser autocomplete backgrounds sometimes
+                            autoComplete="off"
                             {...field}
                           />
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="ml-1" />
                     </FormItem>
                   )}
                 />
@@ -205,14 +206,14 @@ export default function LoginPage() {
                           <Input
                             type={showPassword ? "text" : "password"}
                             placeholder="Parol"
-                            className="pl-12 pr-12 h-14 bg-muted/30 border-transparent focus:bg-background transition-all duration-200 text-base"
+                            className="pl-12 pr-12 h-14 bg-muted/40 border-border focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary transition-all duration-200 text-base rounded-xl"
                             data-testid="input-password"
                             {...field}
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
@@ -223,20 +224,20 @@ export default function LoginPage() {
                           </button>
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="ml-1" />
                     </FormItem>
                   )}
                 />
 
                 <Button
                   type="submit"
-                  className="w-full h-14 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                  className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all duration-200"
                   disabled={isSubmitting}
                   data-testid="button-login"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <Loader2 className="w-5 h-5 mr-3 animate-spin" />
                       Tizimga kirilmoqda...
                     </>
                   ) : (
@@ -253,3 +254,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

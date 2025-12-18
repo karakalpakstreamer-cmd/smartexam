@@ -39,6 +39,7 @@ const registratorNav: NavItem[] = [
   { label: "Talabalar", href: "/registrator/talabalar", icon: UserCircle },
   { label: "Monitoring", href: "/registrator/monitoring", icon: Activity },
   { label: "Sozlamalar", href: "/registrator/sozlamalar", icon: Settings },
+  { label: "Profil", href: "/registrator/profil", icon: User },
 ];
 
 const teacherNav: NavItem[] = [

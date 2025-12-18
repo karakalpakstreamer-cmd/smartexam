@@ -194,7 +194,7 @@ export default function CreateExamPage() {
               ← Orqaga
             </Button>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground font-serif">Yangi Imtihon</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Yangi Imtihon</h1>
           <p className="text-muted-foreground mt-1 max-w-2xl">
             Imtihon parametrlarini o'rnating, guruhlarni biriktiring va savollar bazasini shakllantiring.
           </p>

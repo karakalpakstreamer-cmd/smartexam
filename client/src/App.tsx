@@ -18,8 +18,8 @@ import SubjectsPage from "@/pages/registrator/subjects";
 import TeachersPage from "@/pages/registrator/teachers";
 import StudentsPage from "@/pages/registrator/students";
 import MonitoringPage from "@/pages/registrator/monitoring";
-import SettingsPage from "@/pages/registrator/settings";
-import ProfilePage from "@/pages/registrator/profile";
+import SettingsPage from "@/pages/settings";
+import ProfilePage from "@/pages/profile";
 
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import LecturesPage from "@/pages/teacher/lectures";

@@ -367,6 +367,72 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/auth/profile", requireAuth, async (req, res) => {
+    try {
+      const { email, phone, fullName } = req.body;
+      const user = await storage.getUserById(req.session.userId!);
+
+      if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi" });
+
+      // Determine which update helper to use based on role, or generic update
+      // Since storage methods splits by role for update, passing partial data might be tricky if we don't have a generic updateUser.
+      // But actually storage.updateTeacher/Student mostly updates the 'users' table. 
+      // Let's implement a generic user update in storage or reuse specific ones.
+      // For detailed validation, specific is better. But for simple email/phone/name, a generic one is fine.
+      // Since we don't have a generic 'updateUser', we'll check role.
+
+      let updatedUser;
+      if (user.role === 'oqituvchi') {
+        updatedUser = await storage.updateTeacher(user.id, { email, phone, fullName });
+      } else if (user.role === 'talaba') {
+        updatedUser = await storage.updateStudent(user.id, { email, phone, fullName });
+      } else if (user.role === 'registrator') {
+        // We don't have updateRegistrator, let's just cheat and update generic fields directly via db if needed,
+        // OR add updateRegistrator?
+        // Actually updateTeacher just updates users table for these fields. We can seemingly use it or add a new method.
+        // Let's use `updateTeacher` as it essentially updates the user table, BUT it might expect departmentId etc.
+        // Safer to add 'updateUser' to storage interface or use direct db update here? 
+        // Direct DB update here is messy.
+        // Let's rely on specific ones. But Registrator has no update method exposed.
+        // Let's just assume we can use a new method `updateUserProfile` in storage. I should add that.
+        // For now, I will add generic handling in storage.ts or just use DB directly here if easy.
+        // But `routes.ts` should avoid direct DB access.
+        // I will stick to what I have: I'll use `updateTeacher` for registrator for now or skip?
+        // Actually, I should update `storage.ts` to have `updateUser(id, data)` which is generic.
+        // Returning 501 for now? No, user wants it working.
+
+        // Let's actually add the method to storage.ts in the next step. 
+        // For now, I'll write the route assuming `storage.updateUser` exists.
+        updatedUser = await storage.updateUser(user.id, { email, phone, fullName });
+      } else {
+        updatedUser = await storage.updateUser(user.id, { email, phone, fullName });
+      }
+
+      res.json({ user: { ...updatedUser, passwordHash: undefined } });
+    } catch (error) {
+      console.error("Profile update error", error);
+      res.status(500).json({ error: "Profilni yangilashda xatolik" });
+    }
+  });
+
+  app.patch("/api/auth/password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "Yaroqsiz ma'lumotlar" });
+      }
+
+      const success = await storage.changePassword(req.session.userId!, currentPassword, newPassword);
+      if (!success) {
+        return res.status(400).json({ error: "Joriy parol noto'g'ri" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Parol o'zgartirishda xatolik" });
+    }
+  });
+
   app.get("/api/stats", requireAuth, requireRole("registrator"), async (req, res) => {
     try {
       const stats = await storage.getStats();
@@ -433,9 +499,12 @@ export async function registerRoutes(
       }
       const faculty = await storage.createFaculty({ name, code });
       res.json(faculty);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Create faculty error:", error);
-      res.status(500).json({ error: "Fakultet yaratishda xatolik" });
+      if (error.code === '23505') {
+        return res.status(409).json({ error: `"${req.body.code}" kodli fakultet allaqachon mavjud` });
+      }
+      res.status(500).json({ error: "Fakultet yaratishda xatolik: " + (error.message || "Noma'lum xatolik") });
     }
   });
 
@@ -445,7 +514,11 @@ export async function registerRoutes(
       const { name, code } = req.body;
       const faculty = await storage.updateFaculty(parseInt(id), { name, code });
       res.json(faculty);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Update faculty error:", error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: `"${req.body.code}" kodli fakultet allaqachon mavjud` });
+      }
       res.status(500).json({ error: "Fakultet yangilashda xatolik" });
     }
   });
