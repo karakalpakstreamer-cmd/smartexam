@@ -39,14 +39,10 @@ function StatCard({
   value,
   subtitle,
   icon: Icon,
-  trend,
-  className,
-}: {
   title: string;
   value: number | string;
   subtitle: string;
   icon: typeof Building2;
-  trend?: string;
   className?: string;
 }) {
   return (
@@ -56,11 +52,6 @@ function StatCard({
           <div className="p-2 bg-primary/10 rounded-lg text-primary">
             <Icon className="w-5 h-5" />
           </div>
-          {trend && (
-            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-              {trend}
-            </span>
-          )}
         </div>
         <div>
           <p className="text-sm font-medium text-muted-foreground">{title}</p>

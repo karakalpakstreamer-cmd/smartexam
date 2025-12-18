@@ -65,8 +65,12 @@ export default function FacultiesPage() {
       setFormData({ name: "", code: "" });
       toast({ title: "Muvaffaqiyatli!", description: "Fakultet qo'shildi" });
     },
-    onError: () => {
-      toast({ variant: "destructive", title: "Xatolik!", description: "Fakultet qo'shishda xatolik" });
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Xatolik!",
+        description: error.message || "Fakultet qo'shishda xatolik"
+      });
     },
   });
 

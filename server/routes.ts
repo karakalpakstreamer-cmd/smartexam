@@ -251,19 +251,32 @@ function getDefaultGradingResult(studentAnswer: string): GradingResult {
   };
 }
 
+import connectPgSimple from "connect-pg-simple";
+const PgSession = connectPgSimple(session);
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const store = new PgSession({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+  });
+
+  if (app.get("env") === "production") {
+    app.set("trust proxy", 1);
+  }
+
   app.use(
     session({
+      store,
       secret: process.env.SESSION_SECRET || "smartexam-secret-key-2024",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        secure: app.get("env") === "production",
+        sameSite: "lax", // important for auth
       },
     })
   );
