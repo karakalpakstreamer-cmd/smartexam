@@ -39,6 +39,8 @@ function StatCard({
   value,
   subtitle,
   icon: Icon,
+  className,
+}: {
   title: string;
   value: number | string;
   subtitle: string;
