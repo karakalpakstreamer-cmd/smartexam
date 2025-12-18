@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppSidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
 import { formatDistanceToNow } from "date-fns";
 import { uz } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Stats {
   faculties: number;
@@ -39,38 +39,33 @@ function StatCard({
   value,
   subtitle,
   icon: Icon,
-  iconBgColor,
-  pulse,
+  trend,
+  className,
 }: {
   title: string;
   value: number | string;
   subtitle: string;
   icon: typeof Building2;
-  iconBgColor: string;
-  pulse?: boolean;
+  trend?: string;
+  className?: string;
 }) {
   return (
-    <Card>
+    <Card className={cn("overflow-hidden border-border/50 shadow-sm hover:shadow-md transition-shadow", className)}>
       <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${iconBgColor}`}
-          >
-            <Icon className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <Icon className="w-5 h-5" />
           </div>
-          {pulse && (
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+          {trend && (
+            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+              {trend}
             </span>
           )}
         </div>
-        <div className="mt-4">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold mt-1" data-testid={`stat-${title.toLowerCase().replace(/ /g, "-")}`}>
-            {value}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <h3 className="text-3xl font-bold mt-1 tracking-tight">{value}</h3>
+          <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
         </div>
       </CardContent>
     </Card>
@@ -79,10 +74,12 @@ function StatCard({
 
 function StatCardSkeleton() {
   return (
-    <Card>
+    <Card className="border-border/50 shadow-sm">
       <CardContent className="p-6">
-        <Skeleton className="w-10 h-10 rounded-full" />
-        <div className="mt-4 space-y-2">
+        <div className="flex justify-between mb-4">
+          <Skeleton className="w-9 h-9 rounded-lg" />
+        </div>
+        <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-8 w-16" />
           <Skeleton className="h-3 w-20" />
@@ -113,15 +110,29 @@ export default function RegistratorDashboard() {
       draft: { variant: "outline", label: "Qoralama" },
     };
     const { variant, label } = variants[status] || { variant: "outline" as const, label: status };
-    return <Badge variant={variant}>{label}</Badge>;
+    return <Badge variant={variant} className="capitalize">{label}</Badge>;
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background font-sans">
       <AppSidebar />
-      <div className="flex-1 ml-[260px]">
-        <Topbar title="Bosh sahifa" />
-        <main className="p-6">
+      <div className="flex-1 ml-64 p-8">
+
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground font-serif">Boshqaruv Paneli</h1>
+            <p className="text-muted-foreground mt-1">
+              Tizimning umumiy holati va statistikasi bilan tanishing.
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-md border border-border/50">
+            Bugun: {new Date().toLocaleDateString("uz-UZ", { month: "long", day: "numeric", year: "numeric" })}
+          </div>
+        </div>
+
+        <main className="space-y-8">
+          {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statsLoading ? (
               <>
@@ -135,48 +146,49 @@ export default function RegistratorDashboard() {
                 <StatCard
                   title="Fakultetlar"
                   value={stats?.faculties || 0}
-                  subtitle="ta fakultet"
+                  subtitle="Mavjud fakultetlar"
                   icon={Building2}
-                  iconBgColor="bg-blue-500"
                 />
                 <StatCard
                   title="O'qituvchilar"
                   value={stats?.teachers || 0}
-                  subtitle="ta o'qituvchi"
+                  subtitle="Ro'yxatdan o'tgan"
                   icon={GraduationCap}
-                  iconBgColor="bg-green-500"
                 />
                 <StatCard
                   title="Talabalar"
                   value={stats?.students || 0}
-                  subtitle="ta talaba"
+                  subtitle="Faol talabalar"
                   icon={Users}
-                  iconBgColor="bg-purple-500"
+                  trend="+12%"
                 />
                 <StatCard
-                  title="Faol imtihonlar"
+                  title="Faol Imtihonlar"
                   value={stats?.activeExams || 0}
-                  subtitle="ta imtihon"
+                  subtitle="Ayni paytda bo'layotgan"
                   icon={ClipboardCheck}
-                  iconBgColor="bg-orange-500"
-                  pulse={(stats?.activeExams || 0) > 0}
+                  className="border-primary/20 bg-primary/5"
                 />
               </>
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">So'nggi faoliyat</CardTitle>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Activity Log */}
+            <Card className="border-border/60 shadow-sm h-full">
+              <CardHeader className="border-b border-border/40 bg-muted/10 pb-4">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-muted-foreground" />
+                  So'nggi faoliyat
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {activitiesLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className="flex items-center gap-3">
+                  <div className="p-6 space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex gap-4">
                         <Skeleton className="w-8 h-8 rounded-full" />
-                        <div className="flex-1 space-y-1">
+                        <div className="space-y-2 flex-1">
                           <Skeleton className="h-4 w-3/4" />
                           <Skeleton className="h-3 w-1/4" />
                         </div>
@@ -184,83 +196,77 @@ export default function RegistratorDashboard() {
                     ))}
                   </div>
                 ) : activities && activities.length > 0 ? (
-                  <div className="space-y-3">
-                    {activities.slice(0, 10).map((activity) => (
+                  <div className="divide-y divide-border/40">
+                    {activities.slice(0, 6).map((activity) => (
                       <div
                         key={activity.id}
-                        className="flex items-center gap-3 py-2 border-b border-border last:border-0"
-                        data-testid={`activity-${activity.id}`}
+                        className="flex items-start gap-4 p-4 hover:bg-muted/30 transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
+                        <div className="mt-1 w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                          <Activity className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">{activity.action}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(activity.createdAt), {
-                              addSuffix: true,
-                              locale: uz,
-                            })}
-                          </p>
+                          <p className="text-sm font-medium text-foreground">{activity.action}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(activity.createdAt), {
+                                addSuffix: true,
+                                locale: uz,
+                              })}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border">
+                              {activity.userRole}
+                            </span>
+                          </div>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {activity.userRole}
-                        </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>Hozircha faoliyat yo'q</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Yaqinlashayotgan imtihonlar</CardTitle>
+            {/* Upcoming Exams */}
+            <Card className="border-border/60 shadow-sm h-full">
+              <CardHeader className="border-b border-border/40 bg-muted/10 pb-4">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-muted-foreground" />
+                  Yaqinlashayotgan imtihonlar
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {examsLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="p-3 border rounded-lg">
-                        <Skeleton className="h-4 w-1/2 mb-2" />
-                        <Skeleton className="h-3 w-3/4 mb-1" />
-                        <Skeleton className="h-3 w-1/4" />
-                      </div>
-                    ))}
+                  <div className="p-6 space-y-4">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
                   </div>
                 ) : upcomingExams && upcomingExams.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="divide-y divide-border/40">
                     {upcomingExams.slice(0, 5).map((exam) => (
                       <div
                         key={exam.id}
-                        className="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                        data-testid={`exam-${exam.id}`}
+                        className="p-4 hover:bg-muted/30 transition-colors group flex items-center justify-between"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{exam.subjectName}</p>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {exam.teacherName}
-                            </p>
+                        <div>
+                          <p className="font-medium text-foreground group-hover:text-primary transition-colors">{exam.subjectName}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{exam.teacherName}</p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> {exam.examDate} | {exam.startTime}
+                            </span>
                           </div>
-                          {getStatusBadge(exam.status)}
                         </div>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>{exam.examDate}</span>
-                          <span>{exam.startTime}</span>
-                        </div>
+                        {getStatusBadge(exam.status)}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <ClipboardCheck className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Yaqinlashayotgan imtihon yo'q</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p>Rejalashtirilgan imtihonlar yo'q</p>
                   </div>
                 )}
               </CardContent>
@@ -271,3 +277,4 @@ export default function RegistratorDashboard() {
     </div>
   );
 }
+

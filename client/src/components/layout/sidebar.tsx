@@ -14,12 +14,14 @@ import {
   ClipboardList,
   BarChart3,
   User,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface NavItem {
   label: string;
@@ -77,40 +79,43 @@ export function AppSidebar() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-[260px] bg-slate-900 text-white fixed left-0 top-0">
-      <div className="p-4 border-b border-slate-700">
+    <div className="flex flex-col h-screen w-[260px] bg-zinc-950 text-white fixed left-0 top-0 border-r border-zinc-800 z-50 transition-all duration-300">
+      <div className="p-6 border-b border-zinc-800/50">
         <Link href={user.role === "registrator" ? "/registrator" : "/oqituvchi"}>
-          <div className="flex items-center gap-3 cursor-pointer" data-testid="link-home">
-            <img
-              src="/logo.png"
-              alt="SmartExam"
-              className="h-8 w-8"
-              data-testid="img-sidebar-logo"
-            />
-            <span className="text-lg font-bold" data-testid="text-brand">SmartExam</span>
+          <div className="flex items-center gap-3 cursor-pointer group" data-testid="link-home">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-primary/20 rounded-full blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <img
+                src="/logo.png"
+                alt="SmartExam"
+                className="h-8 w-8 relative z-10"
+                data-testid="img-sidebar-logo"
+              />
+            </div>
+            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent" data-testid="text-brand">SmartExam</span>
           </div>
         </Link>
       </div>
 
       <div className="p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 bg-primary">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
+          <Avatar className="h-10 w-10 border border-zinc-700">
+            <AvatarFallback className="bg-primary/20 text-primary font-semibold">
               {getInitials(user.fullName)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate" data-testid="text-user-name">
+            <p className="text-sm font-medium truncate text-zinc-100" data-testid="text-user-name">
               {user.fullName}
             </p>
-            <Badge variant="secondary" className="text-xs mt-1" data-testid="badge-role">
+            <Badge variant="outline" className="text-[10px] mt-1 text-zinc-400 border-zinc-700 h-5 px-1.5 font-normal" data-testid="badge-role">
               {roleLabel}
             </Badge>
           </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-2">
+      <ScrollArea className="flex-1 px-3">
         <nav className="space-y-1 py-2">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -123,15 +128,17 @@ export function AppSidebar() {
             return (
               <Link key={item.href} href={item.href}>
                 <div
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg mx-2 cursor-pointer transition-colors ${
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg mx-1 cursor-pointer transition-all duration-200 group relative overflow-hidden",
                     isActive
-                      ? "bg-slate-700 text-white"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
+                      ? "bg-primary text-white shadow-lg shadow-primary/25"
+                      : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  )}
                   data-testid={`nav-${item.href.split("/").pop()}`}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-sm">{item.label}</span>
+                  <Icon className={cn("w-5 h-5 transition-transform duration-300 group-hover:scale-110", isActive ? "text-white" : "text-zinc-500 group-hover:text-white")} />
+                  <span className="text-sm font-medium">{item.label}</span>
+                  {isActive && <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
                 </div>
               </Link>
             );
@@ -139,10 +146,10 @@ export function AppSidebar() {
         </nav>
       </ScrollArea>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-zinc-800/50 bg-zinc-950/50 backdrop-blur-sm">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-slate-300 hover:text-white hover:bg-slate-800"
+          className="w-full justify-start gap-3 text-zinc-400 hover:text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
           onClick={handleLogout}
           data-testid="button-logout"
         >

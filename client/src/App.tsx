@@ -36,19 +36,19 @@ import ExamSuccessPage from "@/pages/student/exam-success";
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-background animate-fade-in">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Yuklanmoqda...</p>
+        <p className="text-muted-foreground animate-pulse">Yuklanmoqda...</p>
       </div>
     </div>
   );
 }
 
-function ProtectedRoute({ 
-  children, 
-  allowedRoles 
-}: { 
+function ProtectedRoute({
+  children,
+  allowedRoles
+}: {
   children: JSX.Element;
   allowedRoles: string[];
 }) {
@@ -73,7 +73,7 @@ function ProtectedRoute({
     }
   }
 
-  return children;
+  return <div className="animate-fade-in w-full min-h-screen">{children}</div>;
 }
 
 function PublicRoute({ children }: { children: JSX.Element }) {
@@ -93,7 +93,7 @@ function PublicRoute({ children }: { children: JSX.Element }) {
     }
   }
 
-  return children;
+  return <div className="animate-fade-in w-full min-h-screen">{children}</div>;
 }
 
 function Router() {

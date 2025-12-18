@@ -1,7 +1,22 @@
+# Replit
+.local/
+.config/replit/
+.replit
+
+# Uploads
+uploads/
+
+# Env
 .env
-node_modules
-uploads
-dist
+
+# Build
+dist/
+node_modules/
+
+# Logs
+*.log
+
+# Misc
 .DS_Store
 server/public
 vite.config.ts.*
