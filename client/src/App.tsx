@@ -19,6 +19,7 @@ import TeachersPage from "@/pages/registrator/teachers";
 import StudentsPage from "@/pages/registrator/students";
 import MonitoringPage from "@/pages/registrator/monitoring";
 import SettingsPage from "@/pages/registrator/settings";
+import ProfilePage from "@/pages/registrator/profile";
 
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import LecturesPage from "@/pages/teacher/lectures";
@@ -164,6 +165,12 @@ function Router() {
       <Route path="/registrator/sozlamalar">
         <ProtectedRoute allowedRoles={["registrator"]}>
           <SettingsPage />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/registrator/profil">
+        <ProtectedRoute allowedRoles={["registrator"]}>
+          <ProfilePage />
         </ProtectedRoute>
       </Route>
 

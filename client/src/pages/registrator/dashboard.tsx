@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Building2, GraduationCap, Users, ClipboardCheck, Clock } from "lucide-react";
+import { Building2, GraduationCap, Users, ClipboardCheck, Clock, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -121,7 +121,7 @@ export default function RegistratorDashboard() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground font-serif">Boshqaruv Paneli</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Boshqaruv Paneli</h1>
             <p className="text-muted-foreground mt-1">
               Tizimning umumiy holati va statistikasi bilan tanishing.
             </p>
@@ -160,7 +160,6 @@ export default function RegistratorDashboard() {
                   value={stats?.students || 0}
                   subtitle="Faol talabalar"
                   icon={Users}
-                  trend="+12%"
                 />
                 <StatCard
                   title="Faol Imtihonlar"

@@ -88,7 +88,7 @@ export function AppSidebar() {
               <img
                 src="/logo.png"
                 alt="SmartExam"
-                className="h-8 w-8 relative z-10"
+                className="h-10 w-10 relative z-10"
                 data-testid="img-sidebar-logo"
               />
             </div>
