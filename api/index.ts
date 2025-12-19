@@ -1,11 +1,5 @@
-import { app, setup } from "../server/app";
+// Vercel serverless function
+// Built server'dan foydalanish (CommonJS)
+const handler = require('../dist/index.cjs');
 
-let initialized = false;
-
-export default async function handler(req: any, res: any) {
-    if (!initialized) {
-        await setup();
-        initialized = true;
-    }
-    app(req, res);
-}
+module.exports = handler;
