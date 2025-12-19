@@ -110,12 +110,10 @@ function Router() {
         </PublicRoute>
       </Route>
 
-      {/* Setup route - faqat development yoki birinchi sozlash uchun */}
-      {import.meta.env.DEV && (
-        <Route path="/setup">
-          <SetupPage />
-        </Route>
-      )}
+      {/* Setup route - birinchi sozlash uchun */}
+      <Route path="/setup">
+        <SetupPage />
+      </Route>
 
       <Route path="/registrator">
         <ProtectedRoute allowedRoles={["registrator"]}>
