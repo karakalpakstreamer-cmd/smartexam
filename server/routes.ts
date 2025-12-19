@@ -5,6 +5,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "../shared/schema";
 import { GoogleGenAI } from "@google/genai";
 import * as mammoth from "mammoth";
 
@@ -289,25 +291,51 @@ export async function registerRoutes(
   });
 
   app.post("/api/setup", async (req, res) => {
+    console.log("[SETUP] Setup request received");
+    console.log("[SETUP] Request body:", { ...req.body, password: "[REDACTED]" });
+
     try {
+      // Check database connection
+      console.log("[SETUP] Checking database connection...");
+      await db.select().from(users).limit(1);
+      console.log("[SETUP] Database connection OK");
+
       const needsSetup = await storage.checkSetupNeeded();
+      console.log("[SETUP] Needs setup:", needsSetup);
+
       if (!needsSetup) {
+        console.log("[SETUP] System already configured");
         return res.status(400).json({ error: "Tizim allaqachon sozlangan" });
       }
 
       const { fullName, email, phone, password, userId } = req.body;
+      console.log("[SETUP] Validating input data...");
+
       if (!fullName || !password) {
+        console.log("[SETUP] Validation failed: missing required fields");
         return res.status(400).json({ error: "F.I.O. va parol majburiy" });
       }
 
+      console.log("[SETUP] Creating registrator user...");
       const user = await storage.setupSystem({ fullName, email, phone, password, userId });
+      console.log("[SETUP] User created successfully:", user.userId);
+
       res.json({ success: true, userId: user.userId });
     } catch (error: any) {
-      console.error("Setup error:", error);
+      console.error("[SETUP] Setup error occurred:");
+      console.error("[SETUP] Error message:", error.message);
+      console.error("[SETUP] Error code:", error.code);
+      console.error("[SETUP] Error stack:", error.stack);
+      console.error("[SETUP] Full error object:", JSON.stringify(error, null, 2));
+
       if (error.code === '23505') { // Unique violation
         return res.status(409).json({ error: "Bu ID bilan foydalanuvchi allaqachon mavjud" });
       }
-      res.status(500).json({ error: "Tizim sozlashda xatolik: " + (error.message || String(error)) });
+
+      res.status(500).json({
+        error: "Tizim sozlashda xatolik: " + (error.message || String(error)),
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 

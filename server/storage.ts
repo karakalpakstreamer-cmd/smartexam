@@ -134,22 +134,41 @@ function generatePassword(userId: string): string {
 
 export const storage: IStorage = {
   async checkSetupNeeded(): Promise<boolean> {
-    const registrators = await db.select().from(users).where(eq(users.role, "registrator")).limit(1);
-    return registrators.length === 0;
+    try {
+      console.log("[STORAGE] Checking if setup is needed...");
+      const registrators = await db.select().from(users).where(eq(users.role, "registrator")).limit(1);
+      console.log("[STORAGE] Registrators found:", registrators.length);
+      return registrators.length === 0;
+    } catch (error) {
+      console.error("[STORAGE] Error checking setup status:", error);
+      throw error;
+    }
   },
 
   async setupSystem(data): Promise<User> {
-    const passwordHash = await bcrypt.hash(data.password, 10);
-    const [user] = await db.insert(users).values({
-      userId: data.userId || "R001",
-      role: "registrator",
-      fullName: data.fullName,
-      email: data.email,
-      phone: data.phone,
-      passwordHash,
-      isActive: true,
-    }).returning();
-    return user;
+    try {
+      console.log("[STORAGE] Setting up system with data:", { ...data, password: "[REDACTED]" });
+      console.log("[STORAGE] Hashing password...");
+      const passwordHash = await bcrypt.hash(data.password, 10);
+      console.log("[STORAGE] Password hashed successfully");
+
+      console.log("[STORAGE] Inserting user into database...");
+      const [user] = await db.insert(users).values({
+        userId: data.userId || "R001",
+        role: "registrator",
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        passwordHash,
+        isActive: true,
+      }).returning();
+
+      console.log("[STORAGE] User inserted successfully:", user.userId);
+      return user;
+    } catch (error) {
+      console.error("[STORAGE] Error in setupSystem:", error);
+      throw error;
+    }
   },
 
   async getUserById(id: number): Promise<User | undefined> {
