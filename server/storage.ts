@@ -44,7 +44,7 @@ import {
 
 export interface IStorage {
   checkSetupNeeded(): Promise<boolean>;
-  setupSystem(data: { fullName: string; email: string | null; phone: string | null; password: string }): Promise<User>;
+  setupSystem(data: { fullName: string; email: string | null; phone: string | null; password: string; userId?: string }): Promise<User>;
 
   getUserById(id: number): Promise<User | undefined>;
   getUserByUserId(userId: string): Promise<User | undefined>;
@@ -141,7 +141,7 @@ export const storage: IStorage = {
   async setupSystem(data): Promise<User> {
     const passwordHash = await bcrypt.hash(data.password, 10);
     const [user] = await db.insert(users).values({
-      userId: "R001",
+      userId: data.userId || "R001",
       role: "registrator",
       fullName: data.fullName,
       email: data.email,

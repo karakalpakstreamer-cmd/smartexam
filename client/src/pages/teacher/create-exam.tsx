@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AppSidebar } from "@/components/layout/sidebar";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import type { Subject, Question, Group } from "@shared/schema";
+import type { Subject, Question, StudentGroup } from "@shared/schema";
 
 interface QuestionWithLecture extends Question {
   lectureTitle: string;
@@ -55,7 +55,7 @@ export default function CreateExamPage() {
     enabled: !!selectedSubjectId,
   });
 
-  const { data: groups } = useQuery<Group[]>({
+  const { data: groups } = useQuery<StudentGroup[]>({
     queryKey: ["/api/groups"],
   });
 
@@ -158,13 +158,14 @@ export default function CreateExamPage() {
   };
 
   const groupedQuestions = questions?.reduce((acc, q) => {
-    if (!acc[q.lectureId]) {
-      acc[q.lectureId] = {
+    const lectureId = q.lectureId ?? 0;
+    if (!acc[lectureId]) {
+      acc[lectureId] = {
         lectureTitle: q.lectureTitle,
         questions: [],
       };
     }
-    acc[q.lectureId].questions.push(q);
+    acc[lectureId].questions.push(q);
     return acc;
   }, {} as Record<number, { lectureTitle: string; questions: QuestionWithLecture[] }>);
 
@@ -401,8 +402,8 @@ export default function CreateExamPage() {
                                         {q.questionText}
                                       </p>
                                       <div className="flex items-center gap-2">
-                                        {getDifficultyBadge(q.difficulty)}
-                                        {q.keywords && q.keywords.length > 0 && <span className="text-[10px] text-muted-foreground/60">{q.keywords.slice(0, 3).join(", ")}</span>}
+                                        {q.difficulty && getDifficultyBadge(q.difficulty)}
+                                        {q.keywords && Array.isArray(q.keywords) && q.keywords.length > 0 && <span className="text-[10px] text-muted-foreground/60">{q.keywords.slice(0, 3).join(", ")}</span>}
                                       </div>
                                     </div>
                                   </div>

@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 
 const setupSchema = z
   .object({
+    userId: z.string().min(3, "ID kamida 3 ta belgi bo'lishi kerak"),
     fullName: z.string().min(3, "Kamida 3 ta belgi bo'lishi kerak"),
     email: z.string().email("Noto'g'ri email format").or(z.literal("")),
     phone: z.string().optional(),
@@ -54,9 +55,8 @@ function PasswordStrength({ password }: { password: string }) {
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className={`h-1 flex-1 rounded-full ${
-              i <= strength ? colors[strength - 1] : "bg-muted"
-            }`}
+            className={`h-1 flex-1 rounded-full ${i <= strength ? colors[strength - 1] : "bg-muted"
+              }`}
           />
         ))}
       </div>
@@ -79,6 +79,7 @@ export default function SetupPage() {
   const form = useForm<SetupFormData>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
+      userId: "R001",
       fullName: "",
       email: "",
       phone: "",
@@ -93,6 +94,7 @@ export default function SetupPage() {
     setIsSubmitting(true);
     try {
       await apiRequest("POST", "/api/setup", {
+        userId: data.userId,
         fullName: data.fullName,
         email: data.email || null,
         phone: data.phone || null,
@@ -103,12 +105,20 @@ export default function SetupPage() {
         description: "Tizim sozlandi. Endi tizimga kirishingiz mumkin.",
       });
       setLocation("/login");
-    } catch {
-      toast({
-        variant: "destructive",
-        title: "Xatolik!",
-        description: "Tizimni sozlashda xatolik yuz berdi",
-      });
+    } catch (error: any) {
+      if (error.message && error.message.includes("409")) {
+        toast({
+          variant: "destructive",
+          title: "Xatolik!",
+          description: "Bu ID allaqachon mavjud. Iltimos, boshqa ID tanlang.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Xatolik!",
+          description: "Tizimni sozlashda xatolik yuz berdi",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -137,13 +147,27 @@ export default function SetupPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="p-3 bg-muted rounded-lg mb-4">
-                <p className="text-sm font-medium">Registrator ID</p>
-                <p className="text-lg font-mono font-bold text-primary" data-testid="text-registrator-id">
-                  R001
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Avtomatik tayinlangan
-                </p>
+                <FormField
+                  control={form.control}
+                  name="userId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registrator ID</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="R001"
+                          data-testid="input-registrator-id"
+                          className="font-mono font-bold text-primary text-lg"
+                          {...field}
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Siz xohlagan boshqa ID kiritishingiz mumkin
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <FormField

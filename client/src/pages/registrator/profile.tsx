@@ -5,26 +5,65 @@ import { Badge } from "@/components/ui/badge";
 import { AppSidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 
+import { useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 export default function ProfilePage() {
-    const user = {
-        fullName: "Sultan Qudaybergenov Bakhitbaevich",
-        id: "R001",
-        role: "Registrator",
-        email: "sultan.q@smartexam.uz",
-        phone: "+998 90 123 45 67",
-        department: "O'quv bo'limi",
-        joinDate: "Sentabr 2023",
-        status: "Faol"
-    };
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [formData, setFormData] = useState({
+        fullName: "",
+        email: "",
+        phone: "",
+    });
 
     const getInitials = (name: string) => {
         return name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2);
+            ? name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)
+            : "U";
     };
+
+    const updateProfileMutation = useMutation({
+        mutationFn: async (data: typeof formData) => {
+            const res = await apiRequest("PATCH", "/api/auth/profile", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            setIsEditOpen(false);
+            toast({ title: "Muvaffaqiyatli", description: "Profil yangilandi" });
+        },
+        onError: () => {
+            toast({ variant: "destructive", title: "Xatolik", description: "Profilni yangilashda xatolik" });
+        },
+    });
+
+    const handleEditClick = () => {
+        setFormData({
+            fullName: user?.fullName || "",
+            email: user?.email || "",
+            phone: user?.phone || "",
+        });
+        setIsEditOpen(true);
+    };
+
+    const handleSave = () => {
+        updateProfileMutation.mutate(formData);
+    };
+
+    if (!user) return null;
 
     return (
         <div className="flex min-h-screen bg-background font-sans">
@@ -37,7 +76,7 @@ export default function ProfilePage() {
                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Mening Profilim</h1>
                             <p className="text-muted-foreground mt-1">Shaxsiy ma'lumotlar va akkaunt holati.</p>
                         </div>
-                        <Button variant="outline">Profilni tahrirlash</Button>
+                        <Button variant="outline" onClick={handleEditClick}>Profilni tahrirlash</Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -52,16 +91,16 @@ export default function ProfilePage() {
                                 <h2 className="text-xl font-bold text-foreground">{user.fullName}</h2>
                                 <div className="flex items-center gap-2 mt-2">
                                     <Badge variant="secondary" className="px-3 py-1">{user.role}</Badge>
-                                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50">{user.status}</Badge>
+                                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50">{user.isActive ? "Faol" : "Nofaol"}</Badge>
                                 </div>
                                 <div className="mt-6 w-full space-y-3 text-sm">
                                     <div className="flex items-center justify-between py-2 border-b border-border/50">
-                                        <span className="text-muted-foreground font-medium">ID Raqam</span>
-                                        <span className="text-foreground font-mono">{user.id}</span>
+                                        <span className="text-muted-foreground font-medium">Foydalanuvchi ID</span>
+                                        <span className="text-foreground font-mono">{user.userId}</span>
                                     </div>
                                     <div className="flex items-center justify-between py-2 border-b border-border/50">
                                         <span className="text-muted-foreground font-medium">Qo'shilgan sana</span>
-                                        <span className="text-foreground">{user.joinDate}</span>
+                                        <span className="text-foreground">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "-"}</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -95,7 +134,7 @@ export default function ProfilePage() {
                                             <Building2 className="w-3.5 h-3.5" /> Bo'lim
                                         </label>
                                         <p className="text-sm font-medium p-3 bg-muted/30 rounded-lg border border-border/50">
-                                            {user.department}
+                                            -
                                         </p>
                                     </div>
                                     <div className="space-y-2">
@@ -125,6 +164,46 @@ export default function ProfilePage() {
                     </div>
                 </div>
             </div>
-        </div>
+
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Profilni tahrirlash</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="fullName">F.I.O</Label>
+                            <Input
+                                id="fullName"
+                                value={formData.fullName}
+                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Telefon</Label>
+                            <Input
+                                id="phone"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>Bekor qilish</Button>
+                        <Button onClick={handleSave} disabled={updateProfileMutation.isPending}>
+                            {updateProfileMutation.isPending ? "Saqlanmoqda..." : "Saqlash"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 }

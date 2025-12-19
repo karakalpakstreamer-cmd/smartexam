@@ -263,9 +263,7 @@ export async function registerRoutes(
     createTableIfMissing: true,
   });
 
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1);
-  }
+  app.set("trust proxy", 1);
 
   app.use(
     session({
@@ -297,16 +295,19 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Tizim allaqachon sozlangan" });
       }
 
-      const { fullName, email, phone, password } = req.body;
+      const { fullName, email, phone, password, userId } = req.body;
       if (!fullName || !password) {
         return res.status(400).json({ error: "F.I.O. va parol majburiy" });
       }
 
-      const user = await storage.setupSystem({ fullName, email, phone, password });
+      const user = await storage.setupSystem({ fullName, email, phone, password, userId });
       res.json({ success: true, userId: user.userId });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Setup error:", error);
-      res.status(500).json({ error: "Tizim sozlashda xatolik: " + (error instanceof Error ? error.message : String(error)) });
+      if (error.code === '23505') { // Unique violation
+        return res.status(409).json({ error: "Bu ID bilan foydalanuvchi allaqachon mavjud" });
+      }
+      res.status(500).json({ error: "Tizim sozlashda xatolik: " + (error.message || String(error)) });
     }
   });
 
@@ -550,7 +551,11 @@ export async function registerRoutes(
       }
       const department = await storage.createDepartment({ name, code, facultyId });
       res.json(department);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Create department error:", error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Bu kodli yo'nalish allaqachon mavjud" });
+      }
       res.status(500).json({ error: "Yo'nalish yaratishda xatolik" });
     }
   });
@@ -561,7 +566,11 @@ export async function registerRoutes(
       const { name, code, facultyId } = req.body;
       const department = await storage.updateDepartment(parseInt(id), { name, code, facultyId });
       res.json(department);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Update department error:", error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Bu kodli yo'nalish allaqachon mavjud" });
+      }
       res.status(500).json({ error: "Yo'nalish yangilashda xatolik" });
     }
   });
@@ -593,7 +602,11 @@ export async function registerRoutes(
       }
       const group = await storage.createGroup({ name, courseYear, departmentId });
       res.json(group);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Create group error:", error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Bu nomli guruh allaqachon mavjud" });
+      }
       res.status(500).json({ error: "Guruh yaratishda xatolik" });
     }
   });

@@ -106,7 +106,8 @@ export default function TeachersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/teachers", data);
+      const res = await apiRequest("POST", "/api/teachers", data);
+      return res.json();
     },
     onSuccess: (response: { userId: string; password: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });

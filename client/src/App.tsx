@@ -18,8 +18,8 @@ import SubjectsPage from "@/pages/registrator/subjects";
 import TeachersPage from "@/pages/registrator/teachers";
 import StudentsPage from "@/pages/registrator/students";
 import MonitoringPage from "@/pages/registrator/monitoring";
-import SettingsPage from "@/pages/settings";
-import ProfilePage from "@/pages/profile";
+import RegistratorSettingsPage from "@/pages/registrator/settings";
+import RegistratorProfilePage from "@/pages/registrator/profile";
 
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import LecturesPage from "@/pages/teacher/lectures";
@@ -110,9 +110,12 @@ function Router() {
         </PublicRoute>
       </Route>
 
-      <Route path="/setup">
-        <SetupPage />
-      </Route>
+      {/* Setup route - faqat development yoki birinchi sozlash uchun */}
+      {import.meta.env.DEV && (
+        <Route path="/setup">
+          <SetupPage />
+        </Route>
+      )}
 
       <Route path="/registrator">
         <ProtectedRoute allowedRoles={["registrator"]}>
@@ -164,13 +167,13 @@ function Router() {
 
       <Route path="/registrator/sozlamalar">
         <ProtectedRoute allowedRoles={["registrator"]}>
-          <SettingsPage />
+          <RegistratorSettingsPage />
         </ProtectedRoute>
       </Route>
 
       <Route path="/registrator/profil">
         <ProtectedRoute allowedRoles={["registrator"]}>
-          <ProfilePage />
+          <RegistratorProfilePage />
         </ProtectedRoute>
       </Route>
 

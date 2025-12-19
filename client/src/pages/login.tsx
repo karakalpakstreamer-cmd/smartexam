@@ -97,7 +97,7 @@ export default function LoginPage() {
             <img
               src="/logo.png"
               alt="SmartExam"
-              className="h-16 w-16 brightness-0 invert drop-shadow-md"
+              className="h-14 w-14 brightness-0 invert drop-shadow-md"
               data-testid="img-logo"
             />
             <span className="text-3xl font-bold tracking-tight">SmartExam</span>
@@ -131,7 +131,7 @@ export default function LoginPage() {
               Xush kelibsiz
             </h2>
             <p className="text-muted-foreground text-lg">
-              Davom etish uchun o'z roleingizni tanlang va tizimga kiring.
+              Davom etish uchun o'z vazifangizni (rolingizni) tanlang va tizimga kiring.
             </p>
           </div>
 
@@ -147,8 +147,8 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setSelectedRole(role.id)}
                     className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 ease-in-out cursor-pointer overflow-hidden ${isSelected
-                        ? "border-primary bg-primary/5 shadow-md scale-[1.02]"
-                        : "border-border hover:border-primary/40 hover:bg-muted/30"
+                      ? "border-primary bg-primary/5 shadow-md scale-[1.02]"
+                      : "border-border hover:border-primary/40 hover:bg-muted/30"
                       }`}
                     data-testid={`button-role-${role.id}`}
                   >
